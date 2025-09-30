@@ -37,7 +37,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEMO_PAGE = path.join(__dirname, '..', 'demo', 'index.html');
 
-class PageStreamer {
+export class PageStreamer {
   private browser?: Browser;
   private page?: Page;
   private persistentContext?: BrowserContext;
