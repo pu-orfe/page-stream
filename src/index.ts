@@ -353,31 +353,51 @@ class PageStreamer {
     if (this.xdotoolTried) return; // only schedule once
     this.xdotoolTried = true;
     const { spawn } = await import('node:child_process');
+    const cmd = 'xdotool';
     const attempt = (iteration: number) => new Promise<void>(resolve => {
-      const cmd = 'xdotool';
-      const list = spawn(cmd, ['search','--classname','chromium']);
+      const search = spawn(cmd, ['search','--classname','chromium']);
       let buf = '';
-      list.stdout.on('data', d => buf += d.toString());
-      list.on('exit', code => {
-        if (code !== 0 || !buf.trim()) {
-          return resolve();
-        }
-        const wins = buf.trim().split(/\s+/).slice(0,8); // limit processing
+      search.stdout.on('data', d => buf += d.toString());
+      const done = () => resolve();
+      search.on('error', done);
+      search.on('exit', code => {
+        if (code !== 0 || !buf.trim()) return done();
+        const wins = buf.trim().split(/\s+/).slice(0,8);
         wins.forEach(w => {
-          // Heuristic: move mouse near top center then click once to dismiss.
-          const seq = [
-            ['mousemove','--window', w, String(Math.floor(this.opts.width/2)), '10'],
-            ['click','1']
-          ];
-          seq.forEach(args => spawn(cmd, args).on('error',()=>{}));
+          // Retrieve geometry to tailor click positions (best-effort)
+          const geo = spawn(cmd, ['getwindowgeometry','--shell', w]);
+          let gBuf = '';
+          geo.stdout.on('data', d => gBuf += d.toString());
+          geo.on('exit', () => {
+            // Parse WIDTH=, HEIGHT=
+            let W = this.opts.width; let H = this.opts.height;
+            const wMatch = gBuf.match(/WIDTH=(\d+)/); if (wMatch) W = parseInt(wMatch[1],10);
+            const hMatch = gBuf.match(/HEIGHT=(\d+)/); if (hMatch) H = parseInt(hMatch[1],10);
+            // Candidate positions: sweep top-right area plus legacy center click.
+            const xs: number[] = [];
+            const rightOffsets = [20, 40, 60, 90];
+            rightOffsets.forEach(off => { if (W - off > 0) xs.push(W - off); });
+            xs.push(Math.floor(W/2)); // fallback center
+            const ys = [10, 14, 18, 22]; // different possible infobar heights / scaling
+            // For each combination issue a quick move + click.
+            xs.forEach(x => ys.forEach(y => {
+              const seq: string[][] = [
+                ['mousemove','--window', w, String(x), String(y)],
+                ['click','1']
+              ];
+              seq.forEach(args => spawn(cmd, args).on('error',()=>{}));
+            }));
+            // Also try ESC key (occasionally closes transient bars)
+            spawn(cmd, ['key','--window', w, 'Escape']).on('error',()=>{});
+          });
         });
         resolve();
       });
-      list.on('error', () => resolve());
     });
-    // Try a few spaced attempts allowing window to settle
-    for (let i=0;i<5;i++) {
-      await new Promise(r => setTimeout(r, 1200 + i*400));
+    // Try multiple spaced attempts allowing window + infobar to settle / reappear.
+    const attempts = 7;
+    for (let i=0;i<attempts;i++) {
+      await new Promise(r => setTimeout(r, 900 + i*500));
       await attempt(i);
     }
   }
