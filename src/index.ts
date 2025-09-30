@@ -121,7 +121,7 @@ export class PageStreamer {
     // Inject custom CSS if provided
     if (this.opts.injectCss && this.page) {
       try {
-        const cssContent = fs.readFileSync(this.opts.injectCss, 'utf8');
+        const cssContent = await readFileWithRetry(this.opts.injectCss);
         await this.page.addStyleTag({ content: cssContent });
         console.log(`Injected CSS from ${this.opts.injectCss}`);
       } catch (err) {
@@ -273,7 +273,7 @@ export class PageStreamer {
       // Re-inject custom CSS/JS after reload
       if (this.opts.injectCss) {
         try {
-          const cssContent = fs.readFileSync(this.opts.injectCss, 'utf8');
+          const cssContent = await readFileWithRetry(this.opts.injectCss);
           await this.page.addStyleTag({ content: cssContent });
         } catch (err) {
           console.error(`Failed to re-inject CSS after refresh:`, err);
@@ -281,7 +281,7 @@ export class PageStreamer {
       }
       if (this.opts.injectJs) {
         try {
-          const jsContent = fs.readFileSync(this.opts.injectJs, 'utf8');
+          const jsContent = await readFileWithRetry(this.opts.injectJs);
           await this.page.addScriptTag({ content: jsContent });
         } catch (err) {
           console.error(`Failed to re-inject JS after refresh:`, err);
@@ -590,4 +590,19 @@ async function main() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(err => { console.error(err); process.exit(1); });
+}
+
+export async function readFileWithRetry(filePath: string, retries = 3, delayMs = 100): Promise<string> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return fs.readFileSync(filePath, 'utf8');
+    } catch (err: any) {
+      if (err.code === 'ENOENT' && i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error(`File not found after ${retries} retries: ${filePath}`);
 }
