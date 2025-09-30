@@ -32,6 +32,7 @@ interface StreamOptions {
   autoDismissInfobar: boolean; // attempt to close top automation infobar via xdotool (best effort)
   cropInfobar: number; // if >0, crop this many pixels from top of capture to hide infobar
   injectCss?: string; // path to CSS file to inject into the page
+  injectJs?: string; // path to JS file to inject into the page
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -125,6 +126,16 @@ export class PageStreamer {
         console.log(`Injected CSS from ${this.opts.injectCss}`);
       } catch (err) {
         console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+      }
+    }
+    // Inject custom JS if provided
+    if (this.opts.injectJs && this.page) {
+      try {
+        const jsContent = fs.readFileSync(this.opts.injectJs, 'utf8');
+        await this.page.addScriptTag({ content: jsContent });
+        console.log(`Injected JS from ${this.opts.injectJs}`);
+      } catch (err) {
+        console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
       }
     }
     if (this.opts.fullscreen && this.page) {
@@ -476,6 +487,7 @@ async function main() {
   .option('--auto-dismiss-infobar', 'Attempt to auto-dismiss Chromium automation infobar using xdotool (best effort)', false)
   .option('--crop-infobar <px>', 'Crop this many pixels from the top of the captured video (removes persistent infobar rather than clicking it)', (v: string)=>parseInt(v,10), 0)
   .option('--inject-css <file>', 'Inject CSS from file into the page')
+  .option('--inject-js <file>', 'Inject JavaScript from file into the page')
     .option('--refresh-signal <sig>', 'POSIX signal to trigger page refresh', 'SIGHUP')
     .option('--graceful-stop-signal <sig>', 'Signal to gracefully stop', 'SIGTERM')
   .option('--reconnect-attempts <n>', 'Max reconnect attempts for SRT (0 = infinite)', '0')
@@ -523,6 +535,7 @@ async function main() {
     autoDismissInfobar: !!opts.autoDismissInfobar,
     cropInfobar: parseInt(opts.cropInfobar,10) || 0,
     injectCss: opts.injectCss,
+    injectJs: opts.injectJs,
   });
 
 
