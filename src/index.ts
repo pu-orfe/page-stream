@@ -31,6 +31,7 @@ interface StreamOptions {
   suppressAutomationBanner: boolean; // hide "controlled by automated test software" message
   autoDismissInfobar: boolean; // attempt to close top automation infobar via xdotool (best effort)
   cropInfobar: number; // if >0, crop this many pixels from top of capture to hide infobar
+  injectCss?: string; // path to CSS file to inject into the page
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,6 +116,16 @@ export class PageStreamer {
       }
       this.page = await ctx.newPage();
       await this.page.goto(startUrl);
+    }
+    // Inject custom CSS if provided
+    if (this.opts.injectCss && this.page) {
+      try {
+        const cssContent = fs.readFileSync(this.opts.injectCss, 'utf8');
+        await this.page.addStyleTag({ content: cssContent });
+        console.log(`Injected CSS from ${this.opts.injectCss}`);
+      } catch (err) {
+        console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+      }
     }
     if (this.opts.fullscreen && this.page) {
       try {
@@ -464,6 +475,7 @@ async function main() {
   .option('--no-suppress-automation-banner', 'Do not hide Chromium automation banner')
   .option('--auto-dismiss-infobar', 'Attempt to auto-dismiss Chromium automation infobar using xdotool (best effort)', false)
   .option('--crop-infobar <px>', 'Crop this many pixels from the top of the captured video (removes persistent infobar rather than clicking it)', (v: string)=>parseInt(v,10), 0)
+  .option('--inject-css <file>', 'Inject CSS from file into the page')
     .option('--refresh-signal <sig>', 'POSIX signal to trigger page refresh', 'SIGHUP')
     .option('--graceful-stop-signal <sig>', 'Signal to gracefully stop', 'SIGTERM')
   .option('--reconnect-attempts <n>', 'Max reconnect attempts for SRT (0 = infinite)', '0')
@@ -510,6 +522,7 @@ async function main() {
     suppressAutomationBanner: opts.suppressAutomationBanner !== false,
     autoDismissInfobar: !!opts.autoDismissInfobar,
     cropInfobar: parseInt(opts.cropInfobar,10) || 0,
+    injectCss: opts.injectCss,
   });
 
 

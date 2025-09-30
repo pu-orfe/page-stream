@@ -112,6 +112,7 @@ Optional:
   --reconnect-max-delay-ms <n>      Max reconnect delay ms (default 15000)
   --health-interval-seconds <n> Interval for structured health log lines (0=disable, default 30)
   --auto-refresh-seconds <n>  Auto page reload interval in seconds (0=disable)
+  --inject-css <file>         Inject CSS from file into the page
 ```
 
 ## SRT Examples
