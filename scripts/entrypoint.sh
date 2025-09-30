@@ -47,6 +47,19 @@ if [[ "${ENABLE_NOVNC:-0}" == "1" ]]; then
       websockify --web /usr/share/novnc/ 6080 localhost:5900 &
       WEBSOCKIFY_PID=$!
       trap 'kill $WEBSOCKIFY_PID 2>/dev/null || true' EXIT
+      # Provide a redirecting index that auto-connects using empty path (some noVNC versions default to /websockify which 404s in our setup)
+      cat > /usr/share/novnc/index.html <<'REDIR'
+<!doctype html><html><head><meta charset="utf-8"><title>noVNC Redirect</title></head><body>
+<p>Redirecting to noVNC...</p>
+<script>
+  const host = location.hostname;
+  const port = location.port || '6080';
+  // Explicit empty path parameter ensures websocket uses root ('') instead of default 'websockify'
+  const target = `vnc.html?autoconnect=1&host=${host}&port=${port}&path=`;
+  location.replace(target);
+</script>
+</body></html>
+REDIR
     else
       echo "[noVNC] WARNING: websockify not found, using lightweight fallback"
       node -e 'require("http").createServer((req,res)=>{res.writeHead(200,{"Content-Type":"text/plain"});res.end("noVNC fallback (no websockify)\n");}).listen(6080,"127.0.0.1",()=>console.error("[noVNC] fallback HTTP started"));' &

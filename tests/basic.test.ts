@@ -13,12 +13,13 @@ const root = path.join(__dirname, '..');
 
 function runCli(args: string[]): Promise<{ code: number|null; stdout: string; stderr: string; }> {
   return new Promise(res => {
-  const p = spawn('node', ['dist/index.js', ...args], { cwd: root, env: { ...process.env, PAGE_STREAM_TEST_MODE: '1' } });
+    const p = spawn('node', ['dist/index.js', ...args], { cwd: root, env: { ...process.env, PAGE_STREAM_TEST_MODE: '1' } });
     let out=''; let err='';
     p.stdout?.on('data', d => out += d.toString());
     p.stderr?.on('data', d => err += d.toString());
-    p.on('close', code => res({ code, stdout: out, stderr: err }));
-  setTimeout(()=> { p.kill('SIGINT'); }, 800); // shorter in test mode
+    const killTimer = setTimeout(()=> { try { p.kill('SIGINT'); } catch {} }, 800); // shorter in test mode
+    const hardTimer = setTimeout(()=> { try { p.kill('SIGKILL'); } catch {}; res({ code: null, stdout: out, stderr: err }); }, 3000);
+    p.on('close', code => { clearTimeout(killTimer); clearTimeout(hardTimer); res({ code, stdout: out, stderr: err }); });
   });
 }
 

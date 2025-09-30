@@ -254,3 +254,14 @@ Current tests (Node built-in test runner) validate CLI basics.
 npm run build
 npm test
 ```
+
+## UI Flags & Automation Indicators
+
+The tool tries to minimize any non-content chrome from Chromium for clean broadcast capture:
+
+- Fullscreen + kiosk: enabled by default (disable with `--no-fullscreen`).
+- App mode (`--app=`) removes address bar and tabs (disable with `--no-app-mode`).
+- DOM / blink automation banner suppression is on by default (disable with `--no-suppress-automation-banner`).
+- Experimental xdotool dismissal: add `--auto-dismiss-infobar` to send synthetic X11 mouse clicks near the top center of the window a few times shortly after launch. This attempts to close the "is being controlled by automated test software" infobar if present. It is best-effort and ignored if `xdotool` isn’t available.
+
+Health log lines include `infobarDismissTried` when the xdotool heuristic ran.

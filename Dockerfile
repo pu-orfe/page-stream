@@ -1,22 +1,21 @@
 # syntax=docker/dockerfile:1
+
 FROM mcr.microsoft.com/playwright:v1.55.1-jammy as base
-# Playwright image includes Chromium + dependencies; add ffmpeg (full) & optional noVNC stack
+# NOTE: If this base image cannot be pulled due to network restrictions, a manual
+# fallback build (Ubuntu + Node 18 + playwright install) can be created separately.
+# Keeping Dockerfile minimal for reliability; see README (TODO add offline notes).
 USER root
 
 # Avoid interactive tzdata prompt (x11vnc/novnc dependency chain may pull it in)
 ENV DEBIAN_FRONTEND=noninteractive \
         TZ=Etc/UTC
 
+# Extra packages (only minimal set if manual fallback already installed them)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        tzdata \
-        ffmpeg \
-        xvfb \
-        x11vnc \
-        novnc \
-        websockify \
+        ffmpeg xvfb x11vnc novnc websockify xdotool tzdata \
     && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
     && dpkg-reconfigure --frontend noninteractive tzdata \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* || true
 
 WORKDIR /app
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./

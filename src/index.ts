@@ -29,6 +29,7 @@ interface StreamOptions {
   healthIntervalSeconds: number; // 0 = disabled
   autoRefreshSeconds: number; // 0 = disabled
   suppressAutomationBanner: boolean; // hide "controlled by automated test software" message
+  autoDismissInfobar: boolean; // attempt to close top automation infobar via xdotool (best effort)
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,7 @@ class PageStreamer {
   private autoRefreshTimer?: NodeJS.Timeout;
   private userDataDir?: string;
   private suppressApplied = false;
+  private xdotoolTried = false;
 
   constructor(private opts: StreamOptions) {}
 
@@ -123,6 +125,10 @@ class PageStreamer {
       } catch {
         // ignore
       }
+    }
+    // Schedule xdotool-based infobar dismissal if requested
+    if (this.opts.autoDismissInfobar) {
+      this.tryDismissInfobarLoop().catch(err => console.error('xdotool infobar dismissal failed', err));
     }
   }
 
@@ -332,6 +338,7 @@ class PageStreamer {
         restartAttempt: this.restartAttempt,
         lastFfmpegExitCode: this.lastFfmpegExitCode,
         retrying: !!this.restartTimer,
+        infobarDismissTried: this.xdotoolTried,
       };
       try {
         console.log('[health]', JSON.stringify(payload));
@@ -339,6 +346,40 @@ class PageStreamer {
         // ignore
       }
     }, intervalMs);
+  }
+
+  // Attempt to find & close Chromium infobar using xdotool heuristics.
+  private async tryDismissInfobarLoop() {
+    if (this.xdotoolTried) return; // only schedule once
+    this.xdotoolTried = true;
+    const { spawn } = await import('node:child_process');
+    const attempt = (iteration: number) => new Promise<void>(resolve => {
+      const cmd = 'xdotool';
+      const list = spawn(cmd, ['search','--classname','chromium']);
+      let buf = '';
+      list.stdout.on('data', d => buf += d.toString());
+      list.on('exit', code => {
+        if (code !== 0 || !buf.trim()) {
+          return resolve();
+        }
+        const wins = buf.trim().split(/\s+/).slice(0,8); // limit processing
+        wins.forEach(w => {
+          // Heuristic: move mouse near top center then click once to dismiss.
+          const seq = [
+            ['mousemove','--window', w, String(Math.floor(this.opts.width/2)), '10'],
+            ['click','1']
+          ];
+          seq.forEach(args => spawn(cmd, args).on('error',()=>{}));
+        });
+        resolve();
+      });
+      list.on('error', () => resolve());
+    });
+    // Try a few spaced attempts allowing window to settle
+    for (let i=0;i<5;i++) {
+      await new Promise(r => setTimeout(r, 1200 + i*400));
+      await attempt(i);
+    }
   }
 }
 
@@ -361,6 +402,7 @@ async function main() {
     .option('--no-fullscreen', 'Disable fullscreen (windowed)')
   .option('--no-app-mode', 'Disable Chromium app mode (show full browser UI)')
   .option('--no-suppress-automation-banner', 'Do not hide Chromium automation banner')
+  .option('--auto-dismiss-infobar', 'Attempt to auto-dismiss Chromium automation infobar using xdotool (best effort)', false)
     .option('--refresh-signal <sig>', 'POSIX signal to trigger page refresh', 'SIGHUP')
     .option('--graceful-stop-signal <sig>', 'Signal to gracefully stop', 'SIGTERM')
   .option('--reconnect-attempts <n>', 'Max reconnect attempts for SRT (0 = infinite)', '0')
@@ -405,6 +447,7 @@ async function main() {
     healthIntervalSeconds: parseInt(opts.healthIntervalSeconds, 10),
     autoRefreshSeconds: parseInt(opts.autoRefreshSeconds, 10),
     suppressAutomationBanner: opts.suppressAutomationBanner !== false,
+    autoDismissInfobar: !!opts.autoDismissInfobar,
   });
 
 
