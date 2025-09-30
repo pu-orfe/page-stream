@@ -69,13 +69,15 @@ REDIR
   fi
   # Readiness probe (works for both real and fallback)
   for i in {1..60}; do
-    if bash -c 'exec 3<>/dev/tcp/127.0.0.1/6080' 2>/dev/null; then
-      echo -e "GET / HTTP/1.0\r\n\r\n" >&3 || true
+    # Open a TCP connection using bash's /dev/tcp without leaving a stale subshell FD.
+    if { exec 3<>/dev/tcp/127.0.0.1/6080; } 2>/dev/null; then
+      # Minimal HTTP request; ignore write errors.
+      printf 'GET / HTTP/1.0\r\n\r\n' >&3 || true
       sleep 0.1
+      exec 3>&- || true
       echo "[noVNC] ready (after ${i} attempts)" >&2
       if [[ "${EXIT_AFTER_READY:-0}" == "1" && "${LIGHTWEIGHT_NOVNC:-0}" == "1" ]]; then
         echo "[noVNC] exiting after readiness (test mode)" >&2
-        # Allow background processes to flush
         sleep 0.1
         exit 0
       fi
