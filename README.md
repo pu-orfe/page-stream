@@ -1,6 +1,6 @@
-# page-stream
+# Page Stream
 
-Headless, disposable web page video streamer for SRT (priority) and other ingest protocols. It loads a supplied URL (or a local HTML collage demo) in Chromium (Playwright) under Xvfb, captures the virtual display with `ffmpeg`, and pushes encoded video (and silent audio) to an ingest endpoint.
+Headless, disposable web page video streamer for supplying content to public displays. It loads a supplied URL or local HTML in Playwright-controlled Chromium under Xvfb, captures the virtual display with `ffmpeg`, and pushes encoded video (no audio) to an ingest endpoint.
 
 ## Features
 
