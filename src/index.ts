@@ -120,22 +120,30 @@ export class PageStreamer {
     }
     // Inject custom CSS if provided
     if (this.opts.injectCss && this.page) {
-      try {
-        const cssContent = await readFileWithRetry(this.opts.injectCss);
-        await this.page.addStyleTag({ content: cssContent });
-        console.log(`Injected CSS from ${this.opts.injectCss}`);
-      } catch (err) {
-        console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+      if (fs.existsSync(this.opts.injectCss)) {
+        try {
+          const cssContent = await readFileWithRetry(this.opts.injectCss);
+          await this.page.addStyleTag({ content: cssContent });
+          console.log(`Injected CSS from ${this.opts.injectCss}`);
+        } catch (err) {
+          console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+        }
+      } else {
+        console.warn(`CSS file ${this.opts.injectCss} not found; skipping injection`);
       }
     }
     // Inject custom JS if provided
     if (this.opts.injectJs && this.page) {
-      try {
-        const jsContent = fs.readFileSync(this.opts.injectJs, 'utf8');
-        await this.page.addScriptTag({ content: jsContent });
-        console.log(`Injected JS from ${this.opts.injectJs}`);
-      } catch (err) {
-        console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
+      if (fs.existsSync(this.opts.injectJs)) {
+        try {
+          const jsContent = await readFileWithRetry(this.opts.injectJs);
+          await this.page.addScriptTag({ content: jsContent });
+          console.log(`Injected JS from ${this.opts.injectJs}`);
+        } catch (err) {
+          console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
+        }
+      } else {
+        console.warn(`JS file ${this.opts.injectJs} not found; skipping injection`);
       }
     }
     if (this.opts.fullscreen && this.page) {
@@ -272,19 +280,27 @@ export class PageStreamer {
       await this.page.reload({ waitUntil: 'networkidle' });
       // Re-inject custom CSS/JS after reload
       if (this.opts.injectCss) {
-        try {
-          const cssContent = await readFileWithRetry(this.opts.injectCss);
-          await this.page.addStyleTag({ content: cssContent });
-        } catch (err) {
-          console.error(`Failed to re-inject CSS after refresh:`, err);
+        if (fs.existsSync(this.opts.injectCss)) {
+          try {
+            const cssContent = await readFileWithRetry(this.opts.injectCss);
+            await this.page.addStyleTag({ content: cssContent });
+          } catch (err) {
+            console.error(`Failed to re-inject CSS after refresh:`, err);
+          }
+        } else {
+          console.warn(`CSS file ${this.opts.injectCss} not found; skipping re-injection`);
         }
       }
       if (this.opts.injectJs) {
-        try {
-          const jsContent = await readFileWithRetry(this.opts.injectJs);
-          await this.page.addScriptTag({ content: jsContent });
-        } catch (err) {
-          console.error(`Failed to re-inject JS after refresh:`, err);
+        if (fs.existsSync(this.opts.injectJs)) {
+          try {
+            const jsContent = await readFileWithRetry(this.opts.injectJs);
+            await this.page.addScriptTag({ content: jsContent });
+          } catch (err) {
+            console.error(`Failed to re-inject JS after refresh:`, err);
+          }
+        } else {
+          console.warn(`JS file ${this.opts.injectJs} not found; skipping re-injection`);
         }
       }
       console.log('Refresh complete.');
