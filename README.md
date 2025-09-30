@@ -263,5 +263,8 @@ The tool tries to minimize any non-content chrome from Chromium for clean broadc
 - App mode (`--app=`) removes address bar and tabs (disable with `--no-app-mode`).
 - DOM / blink automation banner suppression is on by default (disable with `--no-suppress-automation-banner`).
 - Experimental xdotool dismissal: add `--auto-dismiss-infobar` to send synthetic X11 mouse clicks near the top center of the window a few times shortly after launch. This attempts to close the "is being controlled by automated test software" infobar if present. It is best-effort and ignored if `xdotool` isn’t available.
+  - Enhanced dismissal now also uses `wmctrl` (if present) to focus Chromium windows and sweeps multiple top-right coordinates plus ESC key presses for better reliability.
+  - If the banner persists or you prefer a guaranteed absence without clicking, use `--crop-infobar <px>` to crop N pixels from the top of the captured frame via ffmpeg (injected as a `crop=w:h:0:TOP` filter when no conflicting user `-vf` is supplied). Example: `--crop-infobar 36`.
+  - Cropping is disabled by default (value 0). Choose a value slightly larger than the infobar height (common ranges: 30–50) to fully remove it.
 
 Health log lines include `infobarDismissTried` when the xdotool heuristic ran.
