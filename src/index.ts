@@ -269,7 +269,24 @@ export class PageStreamer {
     try {
       if (!this.page) return;
       console.log('Refreshing streamed page...');
-  await this.page.reload({ waitUntil: 'networkidle' });
+      await this.page.reload({ waitUntil: 'networkidle' });
+      // Re-inject custom CSS/JS after reload
+      if (this.opts.injectCss) {
+        try {
+          const cssContent = fs.readFileSync(this.opts.injectCss, 'utf8');
+          await this.page.addStyleTag({ content: cssContent });
+        } catch (err) {
+          console.error(`Failed to re-inject CSS after refresh:`, err);
+        }
+      }
+      if (this.opts.injectJs) {
+        try {
+          const jsContent = fs.readFileSync(this.opts.injectJs, 'utf8');
+          await this.page.addScriptTag({ content: jsContent });
+        } catch (err) {
+          console.error(`Failed to re-inject JS after refresh:`, err);
+        }
+      }
       console.log('Refresh complete.');
     } finally {
       this.refreshing = false;
