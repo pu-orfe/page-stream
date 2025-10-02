@@ -38,6 +38,10 @@ interface StreamOptions {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEMO_PAGE = path.join(__dirname, '..', 'demo', 'index.html');
+const VISIBILITY_OVERRIDE_SCRIPT = `
+  Object.defineProperty(document, 'hidden', { get: () => false });
+  Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+`;
 
 export class PageStreamer {
   private browser?: Browser;
@@ -99,6 +103,10 @@ export class PageStreamer {
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(this.persistentContext);
       }
+      // Inject visibility override early via init script
+      await this.persistentContext.addInitScript(() => {
+        eval(VISIBILITY_OVERRIDE_SCRIPT);
+      });
       // First page should be the app window.
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
@@ -117,8 +125,7 @@ export class PageStreamer {
       }
       // Inject visibility override early via init script
       await ctx.addInitScript(() => {
-        Object.defineProperty(document, 'hidden', { get: () => false });
-        Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+        eval(VISIBILITY_OVERRIDE_SCRIPT);
       });
       this.page = await ctx.newPage();
       await this.page.goto(startUrl);
@@ -484,10 +491,7 @@ export class PageStreamer {
     }
     // Inject visibility override to ensure slideshow continues
     try {
-      await page.addScriptTag({ content: `
-        Object.defineProperty(document, 'hidden', { get: () => false });
-        Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
-      ` });
+      await page.addScriptTag({ content: VISIBILITY_OVERRIDE_SCRIPT });
       console.log('Injected visibility override script');
     } catch (err) {
       console.error('Failed to inject visibility override:', err);
