@@ -115,37 +115,16 @@ export class PageStreamer {
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(ctx);
       }
+      // Inject visibility override early via init script
+      await ctx.addInitScript(() => {
+        Object.defineProperty(document, 'hidden', { get: () => false });
+        Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+      });
       this.page = await ctx.newPage();
       await this.page.goto(startUrl);
     }
-    // Inject custom CSS if provided
-    if (this.opts.injectCss && this.page) {
-      if (fs.existsSync(this.opts.injectCss)) {
-        try {
-          const cssContent = await readFileWithRetry(this.opts.injectCss);
-          await this.page.addStyleTag({ content: cssContent });
-          console.log(`Injected CSS from ${this.opts.injectCss}`);
-        } catch (err) {
-          console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
-        }
-      } else {
-        console.warn(`CSS file ${this.opts.injectCss} not found; skipping injection`);
-      }
-    }
-    // Inject custom JS if provided
-    if (this.opts.injectJs && this.page) {
-      if (fs.existsSync(this.opts.injectJs)) {
-        try {
-          const jsContent = await readFileWithRetry(this.opts.injectJs);
-          await this.page.addScriptTag({ content: jsContent });
-          console.log(`Injected JS from ${this.opts.injectJs}`);
-        } catch (err) {
-          console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
-        }
-      } else {
-        console.warn(`JS file ${this.opts.injectJs} not found; skipping injection`);
-      }
-    }
+    // Inject custom content
+    await this.injectCustomContent(this.page);
     if (this.opts.fullscreen && this.page) {
       try {
         await this.page.evaluate(() => { try { document.body?.focus(); } catch {} });
@@ -278,31 +257,8 @@ export class PageStreamer {
       if (!this.page) return;
       console.log('Refreshing streamed page...');
       await this.page.reload({ waitUntil: 'networkidle' });
-      // Re-inject custom CSS/JS after reload
-      if (this.opts.injectCss) {
-        if (fs.existsSync(this.opts.injectCss)) {
-          try {
-            const cssContent = await readFileWithRetry(this.opts.injectCss);
-            await this.page.addStyleTag({ content: cssContent });
-          } catch (err) {
-            console.error(`Failed to re-inject CSS after refresh:`, err);
-          }
-        } else {
-          console.warn(`CSS file ${this.opts.injectCss} not found; skipping re-injection`);
-        }
-      }
-      if (this.opts.injectJs) {
-        if (fs.existsSync(this.opts.injectJs)) {
-          try {
-            const jsContent = await readFileWithRetry(this.opts.injectJs);
-            await this.page.addScriptTag({ content: jsContent });
-          } catch (err) {
-            console.error(`Failed to re-inject JS after refresh:`, err);
-          }
-        } else {
-          console.warn(`JS file ${this.opts.injectJs} not found; skipping re-injection`);
-        }
-      }
+      // Re-inject custom content after reload
+      await this.injectCustomContent(this.page);
       console.log('Refresh complete.');
     } finally {
       this.refreshing = false;
@@ -494,6 +450,47 @@ export class PageStreamer {
       await new Promise(r => setTimeout(r, 700 + i*450));
       await focusChromium();
       await attempt(i);
+    }
+  }
+
+  private async injectCustomContent(page: Page) {
+    // Inject custom CSS if provided
+    if (this.opts.injectCss) {
+      if (fs.existsSync(this.opts.injectCss)) {
+        try {
+          const cssContent = await readFileWithRetry(this.opts.injectCss);
+          await page.addStyleTag({ content: cssContent });
+          console.log(`Injected CSS from ${this.opts.injectCss}`);
+        } catch (err) {
+          console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+        }
+      } else {
+        console.warn(`CSS file ${this.opts.injectCss} not found; skipping injection`);
+      }
+    }
+    // Inject custom JS if provided
+    if (this.opts.injectJs) {
+      if (fs.existsSync(this.opts.injectJs)) {
+        try {
+          const jsContent = await readFileWithRetry(this.opts.injectJs);
+          await page.addScriptTag({ content: jsContent });
+          console.log(`Injected JS from ${this.opts.injectJs}`);
+        } catch (err) {
+          console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
+        }
+      } else {
+        console.warn(`JS file ${this.opts.injectJs} not found; skipping injection`);
+      }
+    }
+    // Inject visibility override to ensure slideshow continues
+    try {
+      await page.addScriptTag({ content: `
+        Object.defineProperty(document, 'hidden', { get: () => false });
+        Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+      ` });
+      console.log('Injected visibility override script');
+    } catch (err) {
+      console.error('Failed to inject visibility override:', err);
     }
   }
 }
