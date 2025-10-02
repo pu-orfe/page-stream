@@ -31,11 +31,17 @@ interface StreamOptions {
   suppressAutomationBanner: boolean; // hide "controlled by automated test software" message
   autoDismissInfobar: boolean; // attempt to close top automation infobar via xdotool (best effort)
   cropInfobar: number; // if >0, crop this many pixels from top of capture to hide infobar
+  injectCss?: string; // path to CSS file to inject into the page
+  injectJs?: string; // path to JS file to inject into the page
 }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEMO_PAGE = path.join(__dirname, '..', 'demo', 'index.html');
+const VISIBILITY_OVERRIDE_SCRIPT = `
+  Object.defineProperty(document, 'hidden', { get: () => false });
+  Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+`;
 
 export class PageStreamer {
   private browser?: Browser;
@@ -97,6 +103,8 @@ export class PageStreamer {
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(this.persistentContext);
       }
+      // Inject visibility override early via init script
+      await this.persistentContext.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       // First page should be the app window.
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
@@ -113,9 +121,13 @@ export class PageStreamer {
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(ctx);
       }
+      // Inject visibility override early via init script
+      await ctx.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       this.page = await ctx.newPage();
       await this.page.goto(startUrl);
     }
+    // Inject custom content
+    await this.injectCustomContent(this.page);
     if (this.opts.fullscreen && this.page) {
       try {
         await this.page.evaluate(() => { try { document.body?.focus(); } catch {} });
@@ -247,7 +259,9 @@ export class PageStreamer {
     try {
       if (!this.page) return;
       console.log('Refreshing streamed page...');
-  await this.page.reload({ waitUntil: 'networkidle' });
+      await this.page.reload({ waitUntil: 'networkidle' });
+      // Re-inject custom content after reload
+      await this.injectCustomContent(this.page);
       console.log('Refresh complete.');
     } finally {
       this.refreshing = false;
@@ -441,6 +455,37 @@ export class PageStreamer {
       await attempt(i);
     }
   }
+
+  private async injectCustomContent(page: Page) {
+    // Inject custom CSS if provided
+    if (this.opts.injectCss) {
+      if (fs.existsSync(this.opts.injectCss)) {
+        try {
+          const cssContent = await readFileWithRetry(this.opts.injectCss);
+          await page.addStyleTag({ content: cssContent });
+          console.log(`Injected CSS from ${this.opts.injectCss}`);
+        } catch (err) {
+          console.error(`Failed to inject CSS from ${this.opts.injectCss}:`, err);
+        }
+      } else {
+        console.warn(`CSS file ${this.opts.injectCss} not found; skipping injection`);
+      }
+    }
+    // Inject custom JS if provided
+    if (this.opts.injectJs) {
+      if (fs.existsSync(this.opts.injectJs)) {
+        try {
+          const jsContent = await readFileWithRetry(this.opts.injectJs);
+          await page.addScriptTag({ content: jsContent });
+          console.log(`Injected JS from ${this.opts.injectJs}`);
+        } catch (err) {
+          console.error(`Failed to inject JS from ${this.opts.injectJs}:`, err);
+        }
+      } else {
+        console.warn(`JS file ${this.opts.injectJs} not found; skipping injection`);
+      }
+    }
+  }
 }
 
 async function main() {
@@ -464,6 +509,8 @@ async function main() {
   .option('--no-suppress-automation-banner', 'Do not hide Chromium automation banner')
   .option('--auto-dismiss-infobar', 'Attempt to auto-dismiss Chromium automation infobar using xdotool (best effort)', false)
   .option('--crop-infobar <px>', 'Crop this many pixels from the top of the captured video (removes persistent infobar rather than clicking it)', (v: string)=>parseInt(v,10), 0)
+  .option('--inject-css <file>', 'Inject CSS from file into the page')
+  .option('--inject-js <file>', 'Inject JavaScript from file into the page')
     .option('--refresh-signal <sig>', 'POSIX signal to trigger page refresh', 'SIGHUP')
     .option('--graceful-stop-signal <sig>', 'Signal to gracefully stop', 'SIGTERM')
   .option('--reconnect-attempts <n>', 'Max reconnect attempts for SRT (0 = infinite)', '0')
@@ -510,6 +557,8 @@ async function main() {
     suppressAutomationBanner: opts.suppressAutomationBanner !== false,
     autoDismissInfobar: !!opts.autoDismissInfobar,
     cropInfobar: parseInt(opts.cropInfobar,10) || 0,
+    injectCss: opts.injectCss,
+    injectJs: opts.injectJs,
   });
 
 
@@ -547,4 +596,25 @@ async function main() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(err => { console.error(err); process.exit(1); });
+}
+
+async function readFileWithRetry(filePath: string, retries = 5, delayMs = 200): Promise<string> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fs.promises.readFile(filePath, 'utf8');
+    } catch (err: any) {
+      if (['ENOENT', 'EACCES', 'EMFILE', 'EBUSY'].includes(err.code)) {
+        console.error(`Attempt ${i + 1}/${retries} failed for ${filePath}: ${err.message} (code: ${err.code})`);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
+  }
+  // Unreachable, but added to satisfy TypeScript
+  throw new Error(`File not found after ${retries} retries: ${filePath}`);
 }

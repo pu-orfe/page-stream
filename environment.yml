@@ -18,19 +18,8 @@ dependencies:
   # Provide ffmpeg for local dev streaming without Docker
   - ffmpeg>=6
   # Provide X virtual framebuffer & related X11 libs (linux only). These are meta; may be no-ops on macOS.
-  - xorg-libx11  # ensures X11 client libs present
-  - xorg-xauth
-  - xorg-xvfb-run
+  # Note: X11 packages removed for cross-platform compatibility; install manually if needed on Linux.
+  # - xorg-libx11  # ensures X11 client libs present
+  # - xorg-xauth
+  # - xorg-xvfb-run
   # Node package install done via npm after env create
-  - pip:
-      # (No Python pip deps yet; placeholder for future tooling)
-      - 
-
-# Post-create instructions (not executed automatically):
-#  1. conda env create -f environment.yml
-#  2. conda activate page-stream-dev
-#  3. npm install
-#  4. npx playwright install --with-deps chromium
-#  5. npm run build
-#  6. Run: WIDTH=1280 HEIGHT=720 node dist/index.js --ingest file.ts --format mpegts --url demo/index.html
-# Mac note: Xvfb is Linux only; on macOS you can omit WIDTH/HEIGHT envs and rely on headless capture or run inside Docker.

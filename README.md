@@ -112,6 +112,28 @@ Optional:
   --reconnect-max-delay-ms <n>      Max reconnect delay ms (default 15000)
   --health-interval-seconds <n> Interval for structured health log lines (0=disable, default 30)
   --auto-refresh-seconds <n>  Auto page reload interval in seconds (0=disable)
+  --inject-css <file>         Inject CSS from file into the page
+  --inject-js <file>          Inject JavaScript from file into the page
+```
+
+## Page Customization
+
+You can inject custom CSS or JavaScript into the streamed page for styling or behavior modifications:
+
+- `--inject-css <file>`: Reads CSS from the specified file and applies it to the page.
+- `--inject-js <file>`: Reads JavaScript from the specified file and executes it on the page.
+
+Mount the files into the container and provide absolute paths. Example:
+
+```bash
+docker run --rm \
+  -v $(pwd)/custom.css:/custom.css \
+  -v $(pwd)/custom.js:/custom.js \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=demo \
+  --url demo/index.html \
+  --inject-css /custom.css \
+  --inject-js /custom.js
 ```
 
 ## SRT Examples
