@@ -611,7 +611,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export async function readFileWithRetry(filePath: string, retries = 5, delayMs = 200): Promise<string> {
   for (let i = 0; i < retries; i++) {
     try {
-      return fs.readFileSync(filePath, 'utf8');
+      return await fs.promises.readFile(filePath, 'utf8');
     } catch (err: any) {
       console.error(`Attempt ${i + 1}/${retries} failed for ${filePath}: ${err.message} (code: ${err.code})`);
       if (err.code === 'ENOENT' && i < retries - 1) {
