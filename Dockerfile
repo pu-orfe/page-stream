@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Extra packages (only minimal set if manual fallback already installed them)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg xvfb x11vnc novnc websockify xdotool wmctrl tzdata \
+    ffmpeg xvfb x11vnc novnc websockify xdotool wmctrl tzdata vim \
     && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
     && dpkg-reconfigure --frontend noninteractive tzdata \
     && rm -rf /var/lib/apt/lists/* || true
