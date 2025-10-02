@@ -18,9 +18,10 @@ dependencies:
   # Provide ffmpeg for local dev streaming without Docker
   - ffmpeg>=6
   # Provide X virtual framebuffer & related X11 libs (linux only). These are meta; may be no-ops on macOS.
-  - xorg-libx11  # [linux]  # ensures X11 client libs present
-  - xorg-xauth  # [linux]
-  - xorg-xvfb-run  # [linux]
+  # Note: X11 packages removed for cross-platform compatibility; install manually if needed on Linux.
+  # - xorg-libx11  # ensures X11 client libs present
+  # - xorg-xauth
+  # - xorg-xvfb-run
   # Node package install done via npm after env create
   - pip:
       # (No Python pip deps yet; placeholder for future tooling)
