@@ -485,13 +485,6 @@ export class PageStreamer {
         console.warn(`JS file ${this.opts.injectJs} not found; skipping injection`);
       }
     }
-    // Inject visibility override to ensure slideshow continues
-    try {
-      await page.addScriptTag({ content: VISIBILITY_OVERRIDE_SCRIPT });
-      console.log('Injected visibility override script');
-    } catch (err) {
-      console.error('Failed to inject visibility override:', err);
-    }
   }
 }
 
