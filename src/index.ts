@@ -610,9 +610,13 @@ export async function readFileWithRetry(filePath: string, retries = 5, delayMs =
     try {
       return await fs.promises.readFile(filePath, 'utf8');
     } catch (err: any) {
-      console.error(`Attempt ${i + 1}/${retries} failed for ${filePath}: ${err.message} (code: ${err.code})`);
-      if (err.code === 'ENOENT' && i < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+      if (err.code === 'ENOENT') {
+        console.error(`Attempt ${i + 1}/${retries} failed for ${filePath}: ${err.message} (code: ${err.code})`);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          throw err;
+        }
       } else {
         throw err;
       }
