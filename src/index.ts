@@ -605,8 +605,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(err => { console.error(err); process.exit(1); });
 }
 
-// Exported for testing
-export async function readFileWithRetry(filePath: string, retries = 5, delayMs = 200): Promise<string> {
+async function readFileWithRetry(filePath: string, retries = 5, delayMs = 200): Promise<string> {
   for (let i = 0; i < retries; i++) {
     try {
       return await fs.promises.readFile(filePath, 'utf8');

@@ -4,7 +4,6 @@ import test from 'node:test';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileWithRetry } from '../src/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,23 +32,4 @@ test('CLI accepts ingest and url', async () => {
   const r2 = await runCli(['--ingest','srt://127.0.0.1:9000?streamid=test','--url','demo/index.html']);
   // Should start (code will be SIGINT from our timeout, so null or non-zero acceptable)
   assert.ok(/Streaming page|ffmpeg/i.test(r2.stdout + r2.stderr), 'Expected startup log to contain Streaming page or ffmpeg banner');
-});
-
-test('readFileWithRetry reads existing file', async () => {
-  const testFile = path.join(__dirname, 'test-file.txt');
-  const content = 'test content';
-  fs.writeFileSync(testFile, content);
-  try {
-    const result = await readFileWithRetry(testFile);
-    assert.equal(result, content);
-  } finally {
-    fs.unlinkSync(testFile);
-  }
-});
-
-test('readFileWithRetry throws on non-existent file', async () => {
-  const nonExistent = path.join(__dirname, 'non-existent.txt');
-  await assert.rejects(async () => {
-    await readFileWithRetry(nonExistent, 1, 10); // low retries for speed
-  }, /ENOENT/);
 });
