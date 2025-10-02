@@ -622,5 +622,6 @@ async function readFileWithRetry(filePath: string, retries = 5, delayMs = 200): 
       }
     }
   }
+  // Unreachable, but added to satisfy TypeScript
   throw new Error(`File not found after ${retries} retries: ${filePath}`);
 }
