@@ -104,9 +104,7 @@ export class PageStreamer {
         await this.installAutomationBannerSuppression(this.persistentContext);
       }
       // Inject visibility override early via init script
-      await this.persistentContext.addInitScript(() => {
-        eval(VISIBILITY_OVERRIDE_SCRIPT);
-      });
+      await this.persistentContext.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       // First page should be the app window.
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
@@ -124,9 +122,7 @@ export class PageStreamer {
         await this.installAutomationBannerSuppression(ctx);
       }
       // Inject visibility override early via init script
-      await ctx.addInitScript(() => {
-        eval(VISIBILITY_OVERRIDE_SCRIPT);
-      });
+      await ctx.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       this.page = await ctx.newPage();
       await this.page.goto(startUrl);
     }
