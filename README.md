@@ -263,6 +263,19 @@ Notes:
 - Playwright browser binaries still need to be installed (`npx playwright install`).
 - For SRT or RTMP targets you generally still test best via Docker to mirror network + library stack.
 
+### Quick conda-based build & test (non-interactive)
+
+If your system lacks a global `npm` or you prefer to run everything inside the provided Conda environment without activating it, run:
+
+```bash
+conda env create -f environment.yml -n page-stream-dev
+conda run -n page-stream-dev npm install --no-audit --no-fund
+conda run -n page-stream-dev npm run build
+conda run -n page-stream-dev npm test
+```
+
+This reproduces the same steps used by the maintainers for local validation. One caveat: a noVNC-related test may time out if `websockify` or other optional tools are missing; re-run the single test file for diagnostics if needed.
+
 
 ## Test Mode (Internal)
 
