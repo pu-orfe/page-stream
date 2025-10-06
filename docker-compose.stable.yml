@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # SRT Ingest Listener (receives final composite)
+  # ============================================================================
+  srt-ingest:
+    image: jrottenberg/ffmpeg:4.4-ubuntu
+    container_name: srt-ingest
+    volumes:
+      - ./out:/out
+    networks:
+      - compositor_net
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      mkdir -p /out &&
+      ffmpeg -hide_banner -loglevel info
+      -i "srt://0.0.0.0:9000?mode=listener"
+      -c copy -f mpegts /out/composite.ts
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ============================================================================
+  # Compositor (FFmpeg filter_complex: 2 half-width → 1 full HD)
+  # ============================================================================
+  compositor:
+    image: jrottenberg/ffmpeg:4.4-ubuntu
+    container_name: compositor
+    networks:
+      - compositor_net
+    depends_on:
+      srt-ingest:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      ffmpeg -hide_banner -loglevel info
+      -i "srt://0.0.0.0:10001?mode=listener"
+      -i "srt://0.0.0.0:10002?mode=listener"
+      -filter_complex "[0:v]scale=960:1080[left];[1:v]scale=960:1080[right];[left][right]hstack=inputs=2[outv]"
+      -map "[outv]" -map 0:a?
+      -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0
+      -c:a aac -b:a 128k -ar 44100
+      -f mpegts "srt://srt-ingest:9000?streamid=composite"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: on-failure
+
+  # ============================================================================
+  # Half-Width Sources for Compositor (960×1080)
+  # ============================================================================
+  source-left:
+    build: .
+    image: page-stream:latest
+    container_name: source-left
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=960
+      - HEIGHT=1080
+    networks:
+      - compositor_net
+    depends_on:
+      compositor:
+        condition: service_healthy
+    command: >
+      --ingest srt://compositor:10001?streamid=left
+      --url file:///app/demo/test-left.html
+      --auto-refresh-seconds 3600
+    restart: on-failure
+
+  source-right:
+    build: .
+    image: page-stream:latest
+    container_name: source-right
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=960
+      - HEIGHT=1080
+    networks:
+      - compositor_net
+    depends_on:
+      compositor:
+        condition: service_healthy
+    command: >
+      --ingest srt://compositor:10002?streamid=right
+      --url file:///app/demo/test-right.html
+      --auto-refresh-seconds 3600
+    restart: on-failure
+
+  # ============================================================================
+  # Standard Streaming Instances (1920×1080, isolated from compositor)
+  # ============================================================================
+  standard-1:
+    build: .
+    image: page-stream:latest
+    container_name: standard-1
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+    # No networks declaration = joins default network only
+    command: >
+      --ingest ${STANDARD_1_INGEST:-srt://127.0.0.1:9001?streamid=std1}
+      --url file:///app/demo/test-standard.html
+      --auto-refresh-seconds 3600
+    restart: unless-stopped
+
+  standard-2:
+    build: .
+    image: page-stream:latest
+    container_name: standard-2
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+    command: >
+      --ingest ${STANDARD_2_INGEST:-srt://127.0.0.1:9002?streamid=std2}
+      --url file:///app/demo/test-standard.html
+      --auto-refresh-seconds 3600
+    restart: unless-stopped
+
+  standard-3:
+    build: .
+    image: page-stream:latest
+    container_name: standard-3
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+    command: >
+      --ingest ${STANDARD_3_INGEST:-srt://127.0.0.1:9003?streamid=std3}
+      --url file:///app/demo/test-standard.html
+      --auto-refresh-seconds 3600
+    restart: unless-stopped
+
+networks:
+  compositor_net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-compositor
