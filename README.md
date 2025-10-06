@@ -4,6 +4,8 @@ Headless, disposable web page video streamer for supplying content to public dis
 
 > **Compositor Testing:** For multi-source 50/50 split layout with network-isolated test harness, see [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md) on the `stable-compositor` branch.
 
+> **⚠️ Production Operations:** For critical restart procedures and timestamp synchronization guidance, see [`OPERATIONAL-NOTES.md`](OPERATIONAL-NOTES.md). **Always use full container recreation (`down` + `up`) instead of `restart` for streaming services.**
+
 ## Features
 
 - Single-command containerized streaming of any web page or local HTML file.

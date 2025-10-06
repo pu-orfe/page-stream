@@ -63,10 +63,14 @@ services:
       - |
         while true; do
           ffmpeg -hide_banner -loglevel info \
-            -i "srt://0.0.0.0:10001?mode=listener" \
-            -i "srt://0.0.0.0:10002?mode=listener" \
-            -filter_complex "[0:v][1:v]hstack=inputs=2[outv]" \
+            -fflags +genpts+igndts \
+            -i "srt://0.0.0.0:10001?mode=listener&latency=200000" \
+            -i "srt://0.0.0.0:10002?mode=listener&latency=200000" \
+            -filter_complex "[0:v]fps=30,setpts=N/FRAME_RATE/TB[v0];[1:v]fps=30,setpts=N/FRAME_RATE/TB[v1];[v0][v1]hstack=inputs=2[outv]" \
             -map "[outv]" -map 0:a \
+            -async 1 \
+            -vsync cfr \
+            -r 30 \
             -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
             -c:a aac -b:a 128k -ar 44100 \
             -f mpegts "srt://srt-ingest:9000?streamid=composite"
