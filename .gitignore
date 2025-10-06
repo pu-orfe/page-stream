@@ -5,3 +5,4 @@ npm-debug.log*
 *.tsbuildinfo
 docker-compose.yml
 .env
+out/
