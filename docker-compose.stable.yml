@@ -173,9 +173,12 @@ services:
         condition: service_healthy
     command: >
       --ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3}
-      --url file:///app/demo/test-standard.html
+      --url https://example.com
       --auto-refresh-seconds 3600
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
 networks:
   compositor_net:
