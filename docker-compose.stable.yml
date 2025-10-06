@@ -73,7 +73,7 @@ services:
             -r 30 \
             -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
             -c:a aac -b:a 128k -ar 44100 \
-            -f mpegts "srt://srt-ingest:9000?streamid=composite"
+            -f mpegts "${COMPOSITOR_INGEST:-srt://srt-ingest:9000?streamid=composite}"
           echo "Compositor stream ended, retrying in 5 seconds..."
           sleep 5
         done
@@ -100,7 +100,8 @@ services:
       - DISPLAY=:99
     networks:
       - compositor_net
-    command: --ingest srt://compositor:10001?streamid=left --url file:///app/demo/test-left.html --auto-refresh-seconds 3600
+    # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest srt://compositor:10001?streamid=left --url ${SOURCE_LEFT_URL:-file:///app/demo/test-left.html} --auto-refresh-seconds 3600"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s
@@ -121,7 +122,8 @@ services:
       - DISPLAY=:100
     networks:
       - compositor_net
-    command: --ingest srt://compositor:10002?streamid=right --url file:///app/demo/test-right.html --auto-refresh-seconds 3600
+    # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest srt://compositor:10002?streamid=right --url ${SOURCE_RIGHT_URL:-file:///app/demo/test-right.html} --auto-refresh-seconds 3600"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s
@@ -147,7 +149,8 @@ services:
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: --ingest ${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1} --url file:///app/demo/test-standard.html --auto-refresh-seconds 3600
+    # Use STANDARD_1_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1} --url ${STANDARD_1_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds 3600"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s
@@ -169,7 +172,8 @@ services:
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: --ingest ${STANDARD_2_INGEST:-srt://srt-test-listener:9002?streamid=std2} --url file:///app/demo/test-standard.html --auto-refresh-seconds 3600
+    # Use STANDARD_2_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_2_INGEST:-srt://srt-test-listener:9002?streamid=std2} --url ${STANDARD_2_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds 3600"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s
@@ -191,7 +195,8 @@ services:
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: --ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3} --url https://example.com --auto-refresh-seconds 3600
+    # Use STANDARD_3_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3} --url ${STANDARD_3_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds 3600"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s

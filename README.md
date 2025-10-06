@@ -60,6 +60,28 @@ docker run --rm -p 6080:6080 \
   --ingest srt://your-srt-host:9000?streamid=yourStreamId
 ```
 
+## Environment configuration (docker-compose)
+
+This repository includes an example env file: `.env.stable.example`. Copy it to `.env.stable` or to `.env` before starting the stable docker-compose stack. The compose file will read environment variables so you can override the target pages and ingestion endpoints without editing YAML.
+
+Important variables in `.env.stable.example`:
+
+- `STANDARD_1_URL`, `STANDARD_2_URL`, `STANDARD_3_URL` — the target HTTP(S) pages streamed by the `standard-*` services.
+- `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width source pages used by the compositor sources.
+- `COMPOSITOR_INGEST` — where the compositor sends the composed output. Defaults to the local `srt-ingest` service: `srt://srt-ingest:9000?streamid=composite`. Set this if you want the compositor to forward the composite to an external endpoint.
+
+Quick copy and start (uses the fallback COMPOSITOR_INGEST if unset):
+
+```bash
+cp .env.stable.example .env.stable   # or cp .env.stable.example .env
+# Bring down any running stable stack, then recreate so env changes take effect
+docker-compose -f docker-compose.stable.yml down
+docker-compose -f docker-compose.stable.yml up -d --build
+```
+
+Note: prefer `down` + `up` to `restart` for streaming services — restarting in-place can leave SRT/ffmpeg timestamp state that causes drift; full recreate clears the state.
+
+
 If the provided `--url` is not an absolute HTTP(S) URL and does not exist as a local file, the demo page is used.
 
 ## Refreshing the Streamed Page
