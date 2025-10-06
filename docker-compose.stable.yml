@@ -33,12 +33,11 @@ services:
       - ./out:/out
     networks:
       - compositor_net
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      mkdir -p /out &&
-      ffmpeg -hide_banner -loglevel info
-      -i "srt://0.0.0.0:9000?mode=listener"
-      -c copy -f mpegts /out/composite.ts
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /out
+        ffmpeg -hide_banner -loglevel info -i "srt://0.0.0.0:9000?mode=listener" -c copy -f mpegts /out/composite.ts
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
@@ -58,16 +57,17 @@ services:
     depends_on:
       srt-ingest:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      ffmpeg -hide_banner -loglevel info
-      -i "srt://0.0.0.0:10001?mode=listener"
-      -i "srt://0.0.0.0:10002?mode=listener"
-      -filter_complex "[0:v]scale=960:1080[left];[1:v]scale=960:1080[right];[left][right]hstack=inputs=2[outv]"
-      -map "[outv]" -map 0:a?
-      -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0
-      -c:a aac -b:a 128k -ar 44100
-      -f mpegts "srt://srt-ingest:9000?streamid=composite"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        ffmpeg -hide_banner -loglevel info \
+          -i "srt://0.0.0.0:10001?mode=listener" \
+          -i "srt://0.0.0.0:10002?mode=listener" \
+          -filter_complex "[0:v]scale=960:1080[left];[1:v]scale=960:1080[right];[left][right]hstack=inputs=2[outv]" \
+          -map "[outv]" -map 0:a? \
+          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
+          -c:a aac -b:a 128k -ar 44100 \
+          -f mpegts "srt://srt-ingest:9000?streamid=composite"
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
