@@ -81,6 +81,45 @@ docker-compose -f docker-compose.stable.yml up -d --build
 
 Note: prefer `down` + `up` to `restart` for streaming services — restarting in-place can leave SRT/ffmpeg timestamp state that causes drift; full recreate clears the state.
 
+## Running on macOS with Colima (increase memory)
+
+If you're using Colima as your Docker runtime on macOS (a common lightweight alternative to Docker Desktop), the default VM memory may be too small for multiple full-HD encoders and a compositor. If you see OOMKilled containers (exit code 137) or ffmpeg thread-queue blocking, increase Colima's memory allocation before starting the stack.
+
+1. Check current Colima status and resources:
+
+```bash
+colima status
+```
+
+2. Stop Colima and restart it with more memory (example: 8 GB). Adjust `--memory` to 12g or 16g if you plan to run more concurrent encoders:
+
+```bash
+colima stop
+colima start --cpu 4 --memory 8g --disk 50g
+```
+
+Notes:
+- `--cpu` controls CPU cores available to Colima; 4 is a reasonable starting point for multi-encoder tests.
+- `--memory` accepts values like `8g` or `12g`.
+- `--disk` increases the VM disk; not strictly required for memory but helpful for large builds or logs.
+
+3. Recreate the compose stack so containers pick up the new VM resources:
+
+```bash
+docker-compose -f docker-compose.stable.yml down
+docker-compose -f docker-compose.stable.yml up -d --build
+```
+
+4. Watch logs / health lines to confirm stability:
+
+```bash
+docker-compose -f docker-compose.stable.yml logs --tail 200 --follow
+# or check a specific container
+docker logs --tail 200 -f standard-2
+```
+
+If increasing Colima memory isn't an option, consider reducing per-container resource use (lower resolution/bitrate) or running fewer concurrent standard instances.
+
 
 If the provided `--url` is not an absolute HTTP(S) URL and does not exist as a local file, the demo page is used.
 
