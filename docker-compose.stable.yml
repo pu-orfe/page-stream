@@ -7,13 +7,14 @@ services:
     container_name: srt-test-listener
     volumes:
       - ./out:/out
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      mkdir -p /out &&
-      ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9001?mode=listener" -c copy -f mpegts /out/std1.ts &
-      ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9002?mode=listener" -c copy -f mpegts /out/std2.ts &
-      ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9003?mode=listener" -c copy -f mpegts /out/std3.ts &
-      wait
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /out
+        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9001?mode=listener" -c copy -f mpegts /out/std1.ts &
+        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9002?mode=listener" -c copy -f mpegts /out/std2.ts &
+        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9003?mode=listener" -c copy -f mpegts /out/std3.ts &
+        wait
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
