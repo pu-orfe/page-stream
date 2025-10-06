@@ -14,6 +14,7 @@ services:
         ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9001?mode=listener" -c copy -f mpegts /out/std1.ts &
         ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9002?mode=listener" -c copy -f mpegts /out/std2.ts &
         ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9003?mode=listener" -c copy -f mpegts /out/std3.ts &
+        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9004?mode=listener" -c copy -f mpegts /out/std4.ts &
         wait
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
@@ -97,7 +98,7 @@ services:
     environment:
       - WIDTH=960
       - HEIGHT=1080
-      - DISPLAY=:99
+      - DISPLAY=${SOURCE_LEFT_DISPLAY:-:99}
     networks:
       - compositor_net
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
@@ -119,7 +120,7 @@ services:
     environment:
       - WIDTH=960
       - HEIGHT=1080
-      - DISPLAY=:100
+      - DISPLAY=${SOURCE_RIGHT_DISPLAY:-:100}
     networks:
       - compositor_net
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
@@ -144,7 +145,7 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
-      - DISPLAY=:104
+      - DISPLAY=${STANDARD_1_DISPLAY:-:104}
     # No networks declaration = joins default network only
     depends_on:
       srt-test-listener:
@@ -168,7 +169,7 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
-      - DISPLAY=:105
+      - DISPLAY=${STANDARD_2_DISPLAY:-:105}
     depends_on:
       srt-test-listener:
         condition: service_healthy
@@ -191,7 +192,7 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
-      - DISPLAY=:106
+      - DISPLAY=${STANDARD_3_DISPLAY:-:106}
     depends_on:
       srt-test-listener:
         condition: service_healthy
@@ -217,7 +218,7 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
-      - DISPLAY=:107
+      - DISPLAY=${STANDARD_4_DISPLAY:-:107}
     depends_on:
       srt-test-listener:
         condition: service_healthy
