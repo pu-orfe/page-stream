@@ -208,6 +208,29 @@ services:
       - 8.8.8.8
       - 1.1.1.1
 
+  standard-4:
+    build: .
+    image: page-stream:latest
+    container_name: standard-4
+    volumes:
+      - ./demo:/app/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=:107
+    depends_on:
+      srt-test-listener:
+        condition: service_healthy
+    # Use STANDARD_4_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_4_INGEST:-srt://srt-test-listener:9004?streamid=std4} --url ${STANDARD_4_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
 networks:
   compositor_net:
     driver: bridge
