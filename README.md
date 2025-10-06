@@ -2,6 +2,8 @@
 
 Headless, disposable web page video streamer for supplying content to public displays. It loads a supplied URL or local HTML in Playwright-controlled Chromium under Xvfb, captures the virtual display with `ffmpeg`, and pushes encoded video (no audio) to an ingest endpoint.
 
+> **Compositor Testing:** For multi-source 50/50 split layout with network-isolated test harness, see [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md) on the `stable-compositor` branch.
+
 ## Features
 
 - Single-command containerized streaming of any web page or local HTML file.
