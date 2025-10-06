@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   # ============================================================================
   # SRT Test Listener (receives standard instance streams for testing)
   # ============================================================================
   srt-test-listener:
-    image: jrottenberg/ffmpeg:4.4-ubuntu
+    image: linuxserver/ffmpeg:latest
     container_name: srt-test-listener
     volumes:
       - ./out:/out
@@ -28,7 +26,7 @@ services:
   # SRT Ingest Listener (receives final composite)
   # ============================================================================
   srt-ingest:
-    image: jrottenberg/ffmpeg:4.4-ubuntu
+    image: linuxserver/ffmpeg:latest
     container_name: srt-ingest
     volumes:
       - ./out:/out
@@ -52,7 +50,7 @@ services:
   # Compositor (FFmpeg filter_complex: 2 half-width → 1 full HD)
   # ============================================================================
   compositor:
-    image: jrottenberg/ffmpeg:4.4-ubuntu
+    image: linuxserver/ffmpeg:latest
     container_name: compositor
     networks:
       - compositor_net
