@@ -37,7 +37,11 @@ services:
     command:
       - |
         mkdir -p /out
-        ffmpeg -hide_banner -loglevel info -i "srt://0.0.0.0:9000?mode=listener" -c copy -f mpegts /out/composite.ts
+        while true; do
+          ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9000?mode=listener" -c copy -f mpegts /out/composite.ts
+          echo "SRT connection lost, retrying in 5 seconds..."
+          sleep 5
+        done
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
@@ -54,25 +58,26 @@ services:
     container_name: compositor
     networks:
       - compositor_net
-    depends_on:
-      srt-ingest:
-        condition: service_healthy
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
-        ffmpeg -hide_banner -loglevel info \
-          -i "srt://0.0.0.0:10001?mode=listener" \
-          -i "srt://0.0.0.0:10002?mode=listener" \
-          -filter_complex "[0:v]scale=960:1080[left];[1:v]scale=960:1080[right];[left][right]hstack=inputs=2[outv]" \
-          -map "[outv]" -map 0:a? \
-          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
-          -c:a aac -b:a 128k -ar 44100 \
-          -f mpegts "srt://srt-ingest:9000?streamid=composite"
+        while true; do
+          ffmpeg -hide_banner -loglevel info \
+            -i "srt://0.0.0.0:10001?mode=listener" \
+            -i "srt://0.0.0.0:10002?mode=listener" \
+            -filter_complex "[0:v][1:v]hstack=inputs=2[outv]" \
+            -map "[outv]" -map 0:a \
+            -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
+            -c:a aac -b:a 128k -ar 44100 \
+            -f mpegts "srt://srt-ingest:9000?streamid=composite"
+          echo "Compositor stream ended, retrying in 5 seconds..."
+          sleep 5
+        done
     healthcheck:
-      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      test: ["CMD-SHELL", "pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
       start_period: 10s
     restart: on-failure
 
@@ -91,13 +96,13 @@ services:
       - DISPLAY=:99
     networks:
       - compositor_net
-    depends_on:
-      compositor:
-        condition: service_healthy
-    command: >
-      --ingest srt://compositor:10001?streamid=left
-      --url file:///app/demo/test-left.html
-      --auto-refresh-seconds 3600
+    command: --ingest srt://compositor:10001?streamid=left --url file:///app/demo/test-left.html --auto-refresh-seconds 3600
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: on-failure
 
   source-right:
@@ -112,13 +117,13 @@ services:
       - DISPLAY=:100
     networks:
       - compositor_net
-    depends_on:
-      compositor:
-        condition: service_healthy
-    command: >
-      --ingest srt://compositor:10002?streamid=right
-      --url file:///app/demo/test-right.html
-      --auto-refresh-seconds 3600
+    command: --ingest srt://compositor:10002?streamid=right --url file:///app/demo/test-right.html --auto-refresh-seconds 3600
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: on-failure
 
   # ============================================================================
@@ -133,14 +138,18 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
+      - DISPLAY=:104
     # No networks declaration = joins default network only
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: >
-      --ingest ${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1}
-      --url file:///app/demo/test-standard.html
-      --auto-refresh-seconds 3600
+    command: --ingest ${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1} --url file:///app/demo/test-standard.html --auto-refresh-seconds 3600
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   standard-2:
@@ -152,13 +161,17 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
+      - DISPLAY=:105
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: >
-      --ingest ${STANDARD_2_INGEST:-srt://srt-test-listener:9002?streamid=std2}
-      --url file:///app/demo/test-standard.html
-      --auto-refresh-seconds 3600
+    command: --ingest ${STANDARD_2_INGEST:-srt://srt-test-listener:9002?streamid=std2} --url file:///app/demo/test-standard.html --auto-refresh-seconds 3600
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   standard-3:
@@ -170,13 +183,17 @@ services:
     environment:
       - WIDTH=1920
       - HEIGHT=1080
+      - DISPLAY=:106
     depends_on:
       srt-test-listener:
         condition: service_healthy
-    command: >
-      --ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3}
-      --url https://example.com
-      --auto-refresh-seconds 3600
+    command: --ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3} --url https://example.com --auto-refresh-seconds 3600
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     dns:
       - 8.8.8.8
