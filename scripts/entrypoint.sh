@@ -101,6 +101,20 @@ REDIR
   done
 fi
 
+# If per-container inject environment variables are set, append them to the
+# arguments passed to the node process. This keeps compose files simple and
+# avoids having to craft complex conditional command lines in docker-compose.
+# Example: set INJECT_CSS=/out/custom/inject.css and the entrypoint will
+# append: --inject-css /out/custom/inject.css
+if [[ -n "${INJECT_CSS:-}" ]]; then
+  echo "[entrypoint] INJECT_CSS detected, injecting --inject-css ${INJECT_CSS}" >&2
+  set -- "$@" "--inject-css" "${INJECT_CSS}"
+fi
+if [[ -n "${INJECT_JS:-}" ]]; then
+  echo "[entrypoint] INJECT_JS detected, injecting --inject-js ${INJECT_JS}" >&2
+  set -- "$@" "--inject-js" "${INJECT_JS}"
+fi
+
 # Start node process
 node dist/index.js "$@" &
 APP_PID=$!
