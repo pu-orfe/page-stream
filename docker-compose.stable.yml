@@ -103,15 +103,8 @@ services:
     networks:
       - compositor_net
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
-    # Add input-side ffmpeg tuning flags to make x11grab more robust under VM load
+    # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
-      - "--extra-ffmpeg"
-      - "-thread_queue_size"
-      - "512"
-      - "-probesize"
-      - "5M"
-      - "-analyzeduration"
-      - "1M"
       - "--ingest"
       - "srt://compositor:10001?streamid=left"
       - "--url"
@@ -140,15 +133,8 @@ services:
     networks:
       - compositor_net
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
-    # Add input-side ffmpeg tuning flags to make x11grab more robust under VM load
+    # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
-      - "--extra-ffmpeg"
-      - "-thread_queue_size"
-      - "512"
-      - "-probesize"
-      - "5M"
-      - "-analyzeduration"
-      - "1M"
       - "--ingest"
       - "srt://compositor:10002?streamid=right"
       - "--url"
