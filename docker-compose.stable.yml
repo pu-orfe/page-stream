@@ -7,15 +7,9 @@ services:
     container_name: srt-test-listener
     volumes:
       - ./out:/out
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        mkdir -p /out
-        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9001?mode=listener" -c copy -f mpegts /out/std1.ts &
-        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9002?mode=listener" -c copy -f mpegts /out/std2.ts &
-        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9003?mode=listener" -c copy -f mpegts /out/std3.ts &
-        ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9004?mode=listener" -c copy -f mpegts /out/std4.ts &
-        wait
+      - ./scripts:/out/scripts:ro
+    entrypoint: ["sh","-lc"]
+    command: "/out/scripts/srt-test-listener.sh"
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
@@ -32,17 +26,11 @@ services:
     container_name: srt-ingest
     volumes:
       - ./out:/out
+      - ./scripts:/out/scripts:ro
     networks:
       - compositor_net
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        mkdir -p /out
-        while true; do
-          ffmpeg -hide_banner -loglevel info -nostdin -y -i "srt://0.0.0.0:9000?mode=listener" -c copy -f mpegts /out/composite.ts
-          echo "SRT connection lost, retrying in 5 seconds..."
-          sleep 5
-        done
+    entrypoint: ["sh","-lc"]
+    command: "/out/scripts/srt-ingest.sh"
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
@@ -59,26 +47,10 @@ services:
     container_name: compositor
     networks:
       - compositor_net
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        while true; do
-          # Increase listener latency to tolerate transient stalls (milliseconds)
-          ffmpeg -hide_banner -loglevel info \
-            -fflags +genpts+igndts \
-            -i "srt://0.0.0.0:10001?mode=listener&latency=10000" \
-            -i "srt://0.0.0.0:10002?mode=listener&latency=10000" \
-            -filter_complex "[0:v]fps=30,setpts=N/FRAME_RATE/TB[v0];[1:v]fps=30,setpts=N/FRAME_RATE/TB[v1];[v0][v1]hstack=inputs=2[outv]" \
-            -map "[outv]" -map 0:a \
-            -async 1 \
-            -vsync cfr \
-            -r 30 \
-            -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
-            -c:a aac -b:a 128k -ar 44100 \
-            -f mpegts "${COMPOSITOR_INGEST:-srt://srt-ingest:9000?streamid=composite&latency=10000}"
-          echo "Compositor stream ended, retrying in 5 seconds..."
-          sleep 5
-        done
+    entrypoint: ["sh","-lc"]
+    volumes:
+      - ./scripts:/out/scripts:ro
+    command: "/out/scripts/compositor.sh"
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg"]
       interval: 10s
@@ -96,6 +68,7 @@ services:
     container_name: source-left
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
       - ./out:/out
     environment:
       WIDTH: 960
@@ -106,6 +79,8 @@ services:
       # - probesize / analyzeduration: give demuxer more data to estimate frame rate
       # - rtbufsize: increase input buffer size for transient stalls
       INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      INJECT_CSS: ${SOURCE_LEFT_INJECT_CSS:-}
+      INJECT_JS: ${SOURCE_LEFT_INJECT_JS:-}
       FFREPORT_DIR: /out
       ENABLE_FFREPORT: "1"
     networks:
@@ -128,11 +103,11 @@ services:
     restart: on-failure
 
   source-right:
-    build: .
     image: page-stream:latest
     container_name: source-right
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
       - ./out:/out
     environment:
       WIDTH: 960
@@ -141,6 +116,8 @@ services:
       # Increased input-side buffers and probe durations to make x11grab more robust
       # See notes above in source-left for rationale
       INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      INJECT_CSS: ${SOURCE_RIGHT_INJECT_CSS:-}
+      INJECT_JS: ${SOURCE_RIGHT_INJECT_JS:-}
       FFREPORT_DIR: /out
       ENABLE_FFREPORT: "1"
     networks:
@@ -166,15 +143,17 @@ services:
   # Standard Streaming Instances (1920×1080, isolated from compositor)
   # ============================================================================
   standard-1:
-    build: .
     image: page-stream:latest
     container_name: standard-1
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
       - DISPLAY=${STANDARD_1_DISPLAY:-:104}
+      - INJECT_CSS=${STANDARD_1_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_1_INJECT_JS:-}
     # No networks declaration = joins default network only
     depends_on:
       srt-test-listener:
@@ -190,15 +169,17 @@ services:
     restart: unless-stopped
 
   standard-2:
-    build: .
     image: page-stream:latest
     container_name: standard-2
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
       - DISPLAY=${STANDARD_2_DISPLAY:-:105}
+      - INJECT_CSS=${STANDARD_2_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_2_INJECT_JS:-}
     depends_on:
       srt-test-listener:
         condition: service_healthy
@@ -213,15 +194,17 @@ services:
     restart: unless-stopped
 
   standard-3:
-    build: .
     image: page-stream:latest
     container_name: standard-3
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
       - DISPLAY=${STANDARD_3_DISPLAY:-:106}
+      - INJECT_CSS=${STANDARD_3_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_3_INJECT_JS:-}
     depends_on:
       srt-test-listener:
         condition: service_healthy
@@ -239,15 +222,17 @@ services:
       - 1.1.1.1
 
   standard-4:
-    build: .
     image: page-stream:latest
     container_name: standard-4
     volumes:
       - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
       - DISPLAY=${STANDARD_4_DISPLAY:-:107}
+      - INJECT_CSS=${STANDARD_4_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_4_INJECT_JS:-}
     depends_on:
       srt-test-listener:
         condition: service_healthy
