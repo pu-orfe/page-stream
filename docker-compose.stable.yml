@@ -102,7 +102,21 @@ services:
     networks:
       - compositor_net
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
-    command: "--ingest srt://compositor:10001?streamid=left --url ${SOURCE_LEFT_URL:-file:///app/demo/test-left.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    # Add input-side ffmpeg tuning flags to make x11grab more robust under VM load
+    command:
+      - "--extra-ffmpeg"
+      - "-thread_queue_size"
+      - "512"
+      - "-probesize"
+      - "5M"
+      - "-analyzeduration"
+      - "1M"
+      - "--ingest"
+      - "srt://compositor:10001?streamid=left"
+      - "--url"
+      - "${SOURCE_LEFT_URL:-file:///app/demo/test-left.html}"
+      - "--auto-refresh-seconds"
+      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s
@@ -124,7 +138,21 @@ services:
     networks:
       - compositor_net
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
-    command: "--ingest srt://compositor:10002?streamid=right --url ${SOURCE_RIGHT_URL:-file:///app/demo/test-right.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    # Add input-side ffmpeg tuning flags to make x11grab more robust under VM load
+    command:
+      - "--extra-ffmpeg"
+      - "-thread_queue_size"
+      - "512"
+      - "-probesize"
+      - "5M"
+      - "-analyzeduration"
+      - "1M"
+      - "--ingest"
+      - "srt://compositor:10002?streamid=right"
+      - "--url"
+      - "${SOURCE_RIGHT_URL:-file:///app/demo/test-right.html}"
+      - "--auto-refresh-seconds"
+      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
     healthcheck:
       test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
       interval: 10s

@@ -248,3 +248,13 @@ docker network prune
 ✅ No "network unreachable" or DNS errors in any container logs
 
 If all criteria pass, the harness is stable and ready for production testing.
+
+## Production sizing scenario
+
+Consider the following production-like scenario when choosing host resources:
+
+- 4 `standard` instances at full resolution (1920x1080)
+- 2 `half-width` sources (960x1080) feeding a single compositor
+- Each stream targets a distinct ingest endpoint (no shared IO bottleneck)
+
+For this workload we recommend provisioning at least **8 CPUs and 32 GB RAM** on a real machine (not VM/Colima). This provides headroom for multiple encodes (x264) and avoids the VM I/O/CPU constraints that can show up in local Colima runs.
