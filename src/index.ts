@@ -194,6 +194,13 @@ export class PageStreamer {
     const { width, height, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg } = this.opts;
     const display = process.env.DISPLAY || ':99';
     const args: string[] = [
+      // Improve robustness of the X11 input capture by adding input-side options
+      // before the x11grab input. These reduce dropped frames under load in VM
+      // environments (thread queue, larger probe/analyze sizes).
+      // Input-level tuning (user-visible values as recommended):
+      '-thread_queue_size','512',
+      '-probesize','5M',
+      '-analyzeduration','1M',
       // Video input (X11)
       '-f','x11grab',
       '-framerate', String(fps),
