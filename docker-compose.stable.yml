@@ -99,6 +99,7 @@ services:
       - WIDTH=960
       - HEIGHT=1080
       - DISPLAY=${SOURCE_LEFT_DISPLAY:-:99}
+      - INPUT_FFMPEG_FLAGS=-thread_queue_size\ 512\ -probesize\ 5M\ -analyzeduration\ 1M
     networks:
       - compositor_net
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
@@ -135,6 +136,7 @@ services:
       - WIDTH=960
       - HEIGHT=1080
       - DISPLAY=${SOURCE_RIGHT_DISPLAY:-:100}
+      - INPUT_FFMPEG_FLAGS=-thread_queue_size\ 512\ -probesize\ 5M\ -analyzeduration\ 1M
     networks:
       - compositor_net
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)

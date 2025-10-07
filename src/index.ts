@@ -192,15 +192,17 @@ export class PageStreamer {
   buildFfmpegArgs(): string[] {
     // Build ffmpeg command with correct ordering: all inputs first, then encoding/output options.
     const { width, height, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg } = this.opts;
-    const display = process.env.DISPLAY || ':99';
+  const display = process.env.DISPLAY || ':99';
+  // Allow input-level tuning flags via environment variable (space-separated),
+  // e.g. INPUT_FFMPEG_FLAGS='-thread_queue_size 512 -probesize 5M'
+  const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
+  const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
     const args: string[] = [
       // Improve robustness of the X11 input capture by adding input-side options
       // before the x11grab input. These reduce dropped frames under load in VM
       // environments (thread queue, larger probe/analyze sizes).
       // Input-level tuning (user-visible values as recommended):
-      '-thread_queue_size','512',
-      '-probesize','5M',
-      '-analyzeduration','1M',
+  ...inputFlags,
       // Video input (X11)
       '-f','x11grab',
       '-framerate', String(fps),
