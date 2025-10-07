@@ -2,84 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Page Stream Collage Demo</title>
+  <title>Example Page</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    html,body { margin:0; padding:0; background:#111; color:#eee; font-family:system-ui, sans-serif; height:100%; }
-    h1 { font-size:14px; margin:4px 8px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
-    .grid {
-      display:grid;
-      grid-template-columns: repeat(8, 1fr);
-      grid-auto-rows: minmax(80px, 1fr);
-      gap:6px;
-      height:100vh;
-      padding:6px;
-      box-sizing:border-box;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html,body { height:100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body {
+      display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);
+      color: white; height:100vh;
     }
-    .tile {
-      position:relative;
-      background:#222;
-      border:1px solid #333;
-      border-radius:6px;
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:24px;
-      font-weight:500;
-    }
-    .tile[data-label]::after {
-      content:attr(data-label);
-      position:absolute; left:4px; top:4px;
-      font-size:10px; padding:2px 6px; border-radius:4px;
-      background:rgba(0,0,0,.55); color:#fff; letter-spacing:.5px;
-    }
-    iframe, video, img { width:100%; height:100%; object-fit:cover; border:0; }
-
-    /* Example layout similar to an OBS scene */
-    /* Large main area */
-    .main { grid-column:1 / span 5; grid-row:1 / span 5; }
-    /* Right side stacked */
-    .cam { grid-column:6 / span 3; grid-row:1 / span 2; }
-    .slides { grid-column:6 / span 3; grid-row:3 / span 2; }
-    /* Bottom strip */
-    .ticker { grid-column:1 / span 8; grid-row:6 / span 1; font-size:18px; animation:ticker 30s linear infinite; }
-    @keyframes ticker { 0% { transform:translateX(0);} 100% { transform:translateX(-50%);} }
-    .ticker-inner { white-space:nowrap; }
+    .container { text-align:center; }
+    .label { font-size:96px; font-weight:900; margin-bottom:20px; text-shadow:3px 3px 8px rgba(0,0,0,.25); }
+    .time { font-size:48px; font-weight:300; font-variant-numeric:tabular-nums; }
+    .info { margin-top:18px; font-size:18px; opacity:0.9; }
   </style>
 </head>
 <body>
-  <h1>Page Stream Collage Demo</h1>
-  <div class="grid">
-    <div class="tile main" data-label="Main Feed">
-      <iframe src="https://example.com" loading="lazy" title="Main"></iframe>
-    </div>
-    <div class="tile cam" data-label="Camera">
-      <video id="camVideo" autoplay muted playsinline></video>
-    </div>
-    <div class="tile slides" data-label="Slides">
-      <iframe src="https://developer.mozilla.org" loading="lazy" title="Slides"></iframe>
-    </div>
-    <div class="tile ticker" data-label="Ticker">
-      <div class="ticker-inner" id="tickerText"></div>
-    </div>
+  <div class="container">
+    <div class="label">EXAMPLE</div>
+    <div class="time" id="time"></div>
+    <div class="info">Example HTML page — used as the single source for demo output (no iframes, camera, or ticker)</div>
   </div>
   <script>
-    // Simulated ticker text
-    const msg = "This is a demo collage layout rendered locally for streaming via headless Chromium + ffmpeg over SRT • ";
-    document.getElementById('tickerText').textContent = msg.repeat(10);
-
-    // Try to access webcam (will be blank in headless container)
-    async function initCam(){
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-        document.getElementById('camVideo').srcObject = stream;
-      } catch(e) {
-        const v = document.getElementById('camVideo');
-        v.poster = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect fill="%23222" width="100%" height="100%"/><text x="50%" y="50%" fill="%23bbb" font-size="24" font-family="sans-serif" text-anchor="middle">No Camera</text></svg>';
-      }
+    function updateTime() {
+      const now = new Date();
+      document.getElementById('time').textContent = now.toLocaleTimeString('en-US', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
     }
-    initCam();
+    updateTime();
+    setInterval(updateTime, 1000);
   </script>
 </body>
 </html>

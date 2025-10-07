@@ -63,10 +63,11 @@ services:
     command:
       - |
         while true; do
+          # Increase listener latency to tolerate transient stalls (milliseconds)
           ffmpeg -hide_banner -loglevel info \
             -fflags +genpts+igndts \
-            -i "srt://0.0.0.0:10001?mode=listener&latency=200000" \
-            -i "srt://0.0.0.0:10002?mode=listener&latency=200000" \
+            -i "srt://0.0.0.0:10001?mode=listener&latency=10000" \
+            -i "srt://0.0.0.0:10002?mode=listener&latency=10000" \
             -filter_complex "[0:v]fps=30,setpts=N/FRAME_RATE/TB[v0];[1:v]fps=30,setpts=N/FRAME_RATE/TB[v1];[v0][v1]hstack=inputs=2[outv]" \
             -map "[outv]" -map 0:a \
             -async 1 \
@@ -74,7 +75,7 @@ services:
             -r 30 \
             -c:v libx264 -preset ultrafast -tune zerolatency -b:v 3000k -maxrate 3500k -bufsize 6000k -g 30 -keyint_min 30 -sc_threshold 0 \
             -c:a aac -b:a 128k -ar 44100 \
-            -f mpegts "${COMPOSITOR_INGEST:-srt://srt-ingest:9000?streamid=composite}"
+            -f mpegts "${COMPOSITOR_INGEST:-srt://srt-ingest:9000?streamid=composite&latency=10000}"
           echo "Compositor stream ended, retrying in 5 seconds..."
           sleep 5
         done
@@ -95,18 +96,25 @@ services:
     container_name: source-left
     volumes:
       - ./demo:/app/demo:ro
+      - ./out:/out
     environment:
       WIDTH: 960
       HEIGHT: 1080
       DISPLAY: ${SOURCE_LEFT_DISPLAY:-:99}
-      INPUT_FFMPEG_FLAGS: "-thread_queue_size 512 -probesize 5M -analyzeduration 1M"
+      # Increased input-side buffers and probe durations to make x11grab more robust
+      # - thread_queue_size: increase packet queue to avoid dropping when ffmpeg is busy
+      # - probesize / analyzeduration: give demuxer more data to estimate frame rate
+      # - rtbufsize: increase input buffer size for transient stalls
+      INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      FFREPORT_DIR: /out
+      ENABLE_FFREPORT: "1"
     networks:
       - compositor_net
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
     # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
       - "--ingest"
-      - "srt://compositor:10001?streamid=left"
+      - "srt://compositor:10001?streamid=left&latency=10000"
       - "--url"
       - "${SOURCE_LEFT_URL:-file:///app/demo/test-left.html}"
       - "--auto-refresh-seconds"
@@ -125,18 +133,23 @@ services:
     container_name: source-right
     volumes:
       - ./demo:/app/demo:ro
+      - ./out:/out
     environment:
       WIDTH: 960
       HEIGHT: 1080
       DISPLAY: ${SOURCE_RIGHT_DISPLAY:-:100}
-      INPUT_FFMPEG_FLAGS: "-thread_queue_size 512 -probesize 5M -analyzeduration 1M"
+      # Increased input-side buffers and probe durations to make x11grab more robust
+      # See notes above in source-left for rationale
+      INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      FFREPORT_DIR: /out
+      ENABLE_FFREPORT: "1"
     networks:
       - compositor_net
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
     # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
       - "--ingest"
-      - "srt://compositor:10002?streamid=right"
+      - "srt://compositor:10002?streamid=right&latency=10000"
       - "--url"
       - "${SOURCE_RIGHT_URL:-file:///app/demo/test-right.html}"
       - "--auto-refresh-seconds"

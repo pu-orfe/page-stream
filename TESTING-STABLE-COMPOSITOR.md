@@ -258,3 +258,34 @@ Consider the following production-like scenario when choosing host resources:
 - Each stream targets a distinct ingest endpoint (no shared IO bottleneck)
 
 For this workload we recommend provisioning at least **8 CPUs and 32 GB RAM** on a real machine (not VM/Colima). This provides headroom for multiple encodes (x264) and avoids the VM I/O/CPU constraints that can show up in local Colima runs.
+
+Note: In production or large-scale tests, 8+ CPUs is a minimum guideline. If you plan to run additional compositors, more simultaneous HD sources, or heavier encoding settings, increase CPU and memory proportionally (for example, 12+ CPUs and 64 GB RAM for the next scale tier).
+
+## Enabling FFmpeg report files (FFREPORT) for soak testing
+
+When running longer soak tests you can enable FFmpeg's report output so each ffmpeg process writes a detailed log file. This is useful for correlating compositor demux errors with source restarts.
+
+1. Update `docker-compose.stable.yml` to mount `./out` into the page-stream source containers (this repo's compose file includes an example).
+2. Set the following environment variables for each source service in the compose file:
+
+```yaml
+environment:
+   INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+   FFREPORT_DIR: /out
+   ENABLE_FFREPORT: "1"
+```
+
+3. Bring up the stack and run a soak (example shown below). After the soak, ffmpeg report files will appear in `./out` with names like `ffreport-<pid>-<timestamp>.log`.
+
+Example soak run:
+
+```bash
+docker-compose -f docker-compose.stable.yml up -d --build srt-ingest compositor source-left source-right
+# wait 6-10 minutes while the stack runs
+sleep 360
+# Collect logs and FFREPORT files
+ls -lh out
+grep -H "FFREPORT" out/ffreport-*.log || true
+```
+
+Tip: The page-stream runtime also supports `INPUT_FFMPEG_FLAGS` so you can tune probe and buffer sizes without editing the ffmpeg invocation in the compose file directly.

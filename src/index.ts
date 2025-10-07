@@ -253,7 +253,18 @@ export class PageStreamer {
 
   async launchFfmpeg() {
     const args = this.buildFfmpegArgs();
-    const child = spawn('ffmpeg', args, { stdio: ['ignore','inherit','inherit'] });
+    // Support writing ffmpeg report files inside the container by setting
+    // FFREPORT_DIR to a writable path (e.g. /out) or enabling ENABLE_FFREPORT=1.
+    // When enabled we set FFREPORT=file=<dir>/ffreport-PID-TIMESTAMP.log:level=32
+    const ffreportDir = process.env.FFREPORT_DIR || '/out';
+    const enableReport = (process.env.ENABLE_FFREPORT === '1') || !!process.env.FFREPORT_DIR;
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (enableReport) {
+      const stamp = Date.now();
+      env.FFREPORT = `file=${ffreportDir}/ffreport-${process.pid}-${stamp}.log:level=32`;
+      console.log('[ffmpeg-report] FFREPORT set to', env.FFREPORT);
+    }
+    const child = spawn('ffmpeg', args, { stdio: ['ignore','inherit','inherit'], env });
     this.ff = child as unknown as ChildProcessWithoutNullStreams; // relaxed cast
     child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
       console.log(`ffmpeg exited code=${code} signal=${signal}`);
