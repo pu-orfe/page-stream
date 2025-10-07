@@ -168,6 +168,64 @@ The composite stream is written to `./out/composite.ts`. You can:
   - Change `-preset ultrafast` to `-preset veryfast`
   - Lower bitrate: `-b:v 2000k -maxrate 2500k`
 
+### macOS: permission error mounting `./out` (com.apple.macl)
+
+On some macOS hosts the `out` directory can have a mandatory access control label (`com.apple.macl`) which prevents Docker (or Colima) from performing a `chown` on the bind mount. Symptoms:
+
+- docker-compose fails with "permission denied" while creating mount source path '/.../out': chown ...: permission denied
+
+Quick fix (run on the macOS host):
+
+```bash
+# remove the MACL label from the project out folder
+sudo xattr -d com.apple.macl ./out
+
+# re-run the compose stack
+docker-compose -f docker-compose.stable.yml up -d
+```
+
+If you prefer not to run `sudo`, you can alternatively remove the directory and recreate it as your user:
+
+```bash
+rm -rf ./out && mkdir -p ./out
+docker-compose -f docker-compose.stable.yml up -d
+```
+
+Note: this is a host-level ACL issue and not a bug in the compositor image.
+
+### Colima / Docker resource allocation (CPU / memory)
+
+When running the stable compositor locally under Colima (or other VM-backed Docker on macOS), ensure the VM has enough CPUs and memory allocated. On my test run the Docker host reported:
+
+- CPUs: 6
+- Memory: ~16.7 GiB
+
+I exercised the stack and inspected compositor logs and metrics. Key findings:
+
+- FFmpeg inputs reported 30 fps and the composed output was configured for 30 fps. Logs did not show frame drops, underruns, or "buffer"/"overrun" warnings in the compositor run we sampled. The only notable log line was the ffmpeg suggestion: `-vsync is deprecated. Use -fps_mode` which is informational.
+- Container CPU usage for `compositor` was low (single-digit percent) in the sampled run; memory usage was modest. This indicates the current Colima allocation (6 CPU / 16GB) is adequate for the small stable-compositor test harness with the default configs and two 960x1080 input streams.
+
+Recommendations:
+
+- For local development and CI-style tests with a couple of sources: allocate at least **4 CPU and 8 GB RAM** to Colima/Docker.
+- For heavier local testing (multiple HD sources, higher bitrates, or additional processing): allocate **6+ CPU and 16+ GB RAM**.
+- For production-like workloads (many sources or high-resolution processing), use a dedicated host with 8+ CPUs and 32+ GB RAM and tune ffmpeg encoding presets/bitrate accordingly.
+
+How to change Colima allocation:
+
+```bash
+# stop Colima, then start with explicit resources (example: 6 CPU, 16GB RAM)
+colima stop
+colima start --cpu 6 --memory 16
+
+# verify status
+colima status
+```
+
+Alternatively, if you're using Docker Desktop, update Resources -> CPU / Memory in the Docker Desktop preferences.
+
+When changing allocation, re-run the composer stack and observe `docker stats --no-stream` and the compositor logs for dropped frames or high CPU usage.
+
 ## Clean Up
 
 ```bash
