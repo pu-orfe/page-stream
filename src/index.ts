@@ -541,6 +541,9 @@ async function main() {
     .parse(process.argv);
 
   const opts = program.opts();
+  // CLI flags --inject-css/--inject-js may be omitted; allow environment fallback
+  if (!opts.injectCss && process.env.INJECT_CSS) opts.injectCss = process.env.INJECT_CSS;
+  if (!opts.injectJs && process.env.INJECT_JS) opts.injectJs = process.env.INJECT_JS;
   // Automatic display size fallback: If env WIDTH/HEIGHT (Xvfb) differ from requested capture size,
   // override the CLI width/height to prevent x11grab mismatch errors.
   const envW = process.env.WIDTH ? parseInt(process.env.WIDTH,10) : undefined;
