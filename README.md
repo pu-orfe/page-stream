@@ -1,28 +1,18 @@
 # Page Stream
 
-Headless, disposable web page video streamer for supplying content to public displays. It loads a supplied URL or local HTML in Playwright-controlled Chromium under Xvfb, captures the virtual display with `ffmpeg`, and pushes encoded video (no audio) to an ingest endpoint.
+A headless, disposable web page video streamer for supplying content to public displays.
 
-> **Compositor Testing:** For multi-source 50/50 split layout with network-isolated test harness, see [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md) on the `stable-compositor` branch.
-
-> **⚠️ Production Operations:** For critical restart procedures and timestamp synchronization guidance, see [`OPERATIONAL-NOTES.md`](OPERATIONAL-NOTES.md). **Always use full container recreation (`down` + `up`) instead of `restart` for streaming services.**
+Page Stream loads a supplied URL or local HTML in Playwright-controlled Chromium under Xvfb, captures the virtual display with `ffmpeg`, and pushes encoded video (no audio--yet) to an ingest endpoint.
 
 ## Features
 
-- Single-command containerized streaming of any web page or local HTML file.
-- Included OBS-style collage demo layout (`demo/index.html`).
-- Primary support for SRT ingest (e.g. `srt://host:port?streamid=...`).
-- Also works with RTMP or other `ffmpeg` supported outputs (just change the ingest URI & format flags).
-- Refresh the streamed page live via signal (default `HUP`) without restarting the container or ffmpeg pipeline.
- - Refresh the streamed page live via signal (default `HUP`) without restarting the container or ffmpeg pipeline, or enable automatic periodic refresh.
-- Configurable resolution, FPS, bitrate, codec preset, and extra raw ffmpeg args.
-- Graceful shutdown on `SIGTERM` / `SIGINT`.
-- Extensible Node.js CLI (TypeScript) + minimal test harness.
-- Multi-arch friendly (Playwright base image) — works on ARM64 (Apple Silicon) & x86_64.
- - Exponential SRT reconnect/backoff with configurable attempts & delays plus clear failure diagnostics.
- - Auto-retry with exponential backoff for SRT and RTMP (same flags) with clear failure diagnostics.
- - Structured periodic health log lines (JSON) for observability.
- - Optional noVNC (VNC over WebSocket) viewer to interact with the Chromium session (disabled by default).
- - Minimal-UI app mode (Chromium --app=) to hide address bar / navigation chrome (enabled by default).
+- Single-command, containerized streaming of any web page or local HTML file.
+- CSS overrides and JS vanilla scriptability for transformations and interactions with the resulting page.
+- Compositor for multi-source, collage-style layouts.  See [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md).
+- Scales for production operations.  See [`OPERATIONAL-NOTES.md`](OPERATIONAL-NOTES.md) for restart guidance and troubleshooting.
+- Primary support for SRT, secondary support for RTMP, extensible to other outputs (its just `ffmpeg`!).
+- noVNC viewer to interact with the Chromium session (disabled by default).
+- Optimized for and tested on Apple Silicon.
 
 ## How It Works
 
@@ -32,58 +22,37 @@ Headless, disposable web page video streamer for supplying content to public dis
 4. Output is sent via SRT (default container format `mpegts`).
 5. A `SIGHUP` to the Node process (or container) triggers a page reload only.
 
-## Quick Start (Local Without Container)
+
+## Minimal Requirements 
+
+Requirements vary depending upon the scale and complexity of deployment, as each instance is running, at a minimum, a framebuffer, a browser, and a real-time HD (or greater!) encode to stream.
+
+For the demo:
+
+- Docker
+- 8 CPU Cores (available to Docker)
+- 16GB of RAM (available to Docker)
+
+## Quick Demo
+
+Copy the example `.env.stable.example` to `.env`.  Edit `.env`, setting your own URLs for:
+
+- `STANDARD_1_URL`, etc — the target HTTP(S) pages streamed by the `standard-*`, full screen (HD) services.
+- `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width (HD) source pages used by the example compositor.
+
+Make sure no existing stack is up, build the image, then bring up the stack!
+
+Example streams that you can open with VLC, `ffplay`, etc will appear in the `out` folder.
 
 ```bash
-npm install
-npm run build
-node dist/index.js --ingest srt://127.0.0.1:9000?streamid=demo --url demo/index.html
-```
-
-## Building & Running the Container
-
-```bash
-# Build
-docker build -t page-stream:dev .
-
-# Run (SRT target example)
-docker run --rm \
-  -e WIDTH=1280 -e HEIGHT=720 \
-  page-stream:dev \
-  --ingest srt://your-srt-host:9000?streamid=yourStreamId \
-  --url demo/index.html
-
-# Enable noVNC (adds VNC + WebSocket bridge on :6080) then open http://localhost:6080
-docker run --rm -p 6080:6080 \
-  -e ENABLE_NOVNC=1 \
-  page-stream:dev \
-  --ingest srt://your-srt-host:9000?streamid=yourStreamId
-```
-
-## Environment configuration (docker-compose)
-
-This repository includes an example env file: `.env.stable.example`. Copy it to `.env.stable` or to `.env` before starting the stable docker-compose stack. The compose file will read environment variables so you can override the target pages and ingestion endpoints without editing YAML.
-
-Important variables in `.env.stable.example`:
-
-- `STANDARD_1_URL`, `STANDARD_2_URL`, `STANDARD_3_URL` — the target HTTP(S) pages streamed by the `standard-*` services.
-- `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width source pages used by the compositor sources.
-- `COMPOSITOR_INGEST` — where the compositor sends the composed output. Defaults to the local `srt-ingest` service: `srt://srt-ingest:9000?streamid=composite`. Set this if you want the compositor to forward the composite to an external endpoint.
-
-Quick copy and start (uses the fallback COMPOSITOR_INGEST if unset):
-
-```bash
-cp .env.stable.example .env.stable   # or cp .env.stable.example .env
-# Bring down any running stable stack, then recreate so env changes take effect
+docker-compose build -t page-stream:latest .
 docker-compose -f docker-compose.stable.yml down
 docker-compose -f docker-compose.stable.yml up -d --build
 ```
 
-Note: prefer `down` + `up` to `restart` for streaming services — restarting in-place can leave SRT/ffmpeg timestamp state that causes drift; full recreate clears the state.
+## Resource Constraints 
 
-## Running on macOS with Colima (increase memory)
-
-If you're using Colima as your Docker runtime on macOS (a common lightweight alternative to Docker Desktop), the default VM memory may be too small for multiple full-HD encoders and a compositor. If you see OOMKilled containers (exit code 137) or ffmpeg thread-queue blocking, increase Colima's memory allocation before starting the stack.
+The project tests with Colima as the macOS Docker runtime, and the default VM memory and CPU allocations to Colima are too small (OOMKilled, Exit Code 137 errors).
 
 1. Check current Colima status and resources:
 
@@ -91,37 +60,14 @@ If you're using Colima as your Docker runtime on macOS (a common lightweight alt
 colima status
 ```
 
-2. Stop Colima and restart it with more memory (example: 8 GB). Adjust `--memory` to 12g or 16g if you plan to run more concurrent encoders:
+2. Stop Colima and restart it with access to more CPUs and memory (make sure you have it):
 
 ```bash
 colima stop
-colima start --cpu 4 --memory 8g --disk 50g
-```
-
-Notes:
-- `--cpu` controls CPU cores available to Colima; 4 is a reasonable starting point for multi-encoder tests.
-- `--memory` accepts values like `8g` or `12g`.
-- `--disk` increases the VM disk; not strictly required for memory but helpful for large builds or logs.
-
-3. Recreate the compose stack so containers pick up the new VM resources:
-
-```bash
-docker-compose -f docker-compose.stable.yml down
-docker-compose -f docker-compose.stable.yml up -d --build
-```
-
-4. Watch logs / health lines to confirm stability:
-
-```bash
-docker-compose -f docker-compose.stable.yml logs --tail 200 --follow
-# or check a specific container
-docker logs --tail 200 -f standard-2
+colima start --cpu 8 --memory 16g 
 ```
 
 If increasing Colima memory isn't an option, consider reducing per-container resource use (lower resolution/bitrate) or running fewer concurrent standard instances.
-
-
-If the provided `--url` is not an absolute HTTP(S) URL and does not exist as a local file, the demo page is used.
 
 ## Refreshing the Streamed Page
 
@@ -200,6 +146,57 @@ docker run --rm \
   --inject-css /custom.css \
   --inject-js /custom.js
 ```
+
+Per-service injection when using docker-compose
+---------------------------------------------
+
+When running the multi-container stable stack via `docker-compose.stable.yml` you can inject CSS/JS on a per-service basis using environment variables and mounted files. The compose file reads per-service env vars such as `STANDARD_1_INJECT_CSS`, `STANDARD_1_INJECT_JS`, `SOURCE_LEFT_INJECT_CSS`, etc.
+
+Example `.env.stable` entries:
+
+STANDARD_1_INJECT_CSS=/out/custom/std1.css
+STANDARD_1_INJECT_JS=/out/custom/std1.js
+SOURCE_LEFT_INJECT_CSS=/out/custom/left.css
+
+Mount the host folder into the compose stack before bringing it up, for example by adding a bind mount to the service in `docker-compose.stable.yml` (the provided example compose already mounts `./out` into the containers):
+
+1. Place your files under `./out/custom/` in the repo (or any path you prefer).
+2. Set the env vars above in your local `.env.stable` (copy from `.env.stable.example`).
+3. Start the stack:
+
+```bash
+docker-compose -f docker-compose.stable.yml up -d --build
+```
+
+Notes:
+- Per-service inject env vars are optional — leaving them empty is safe and no injection will be attempted.
+- Ensure the env value points to the absolute path inside the container where you mounted the file (the compose example uses `/out/...`).
+
+Demo injection (quick test)
+---------------------------
+
+For a quick demo the repository includes small example assets under `demo/assets/` (`inject.css` and `inject.js`). To try them with the compose stack:
+
+1. Copy the example env file and set an inject var (or edit directly):
+
+```bash
+cp .env.stable.example .env.stable
+# in .env.stable set, for example:
+# STANDARD_1_INJECT_CSS=/out/demo/assets/inject.css
+# STANDARD_1_INJECT_JS=/out/demo/assets/inject.js
+```
+
+2. The compose configuration already mounts `./demo` into each service in two places. If you changed mounts, ensure the files are available inside the container at `/out/demo/assets/` or adjust the env path accordingly.
+
+3. Start the stable stack and open the `standard-1` output (or inspect recorded `out/` files):
+
+```bash
+docker-compose -f docker-compose.stable.yml up -d --build
+```
+
+You should see the demo banner and pulsing H1 from the injected JS/CSS if injection was applied successfully. Check container logs for messages like `[demo-inject] inject.js loaded` in the Chromium console output captured by the Node process.
+
+
 
 ## SRT Examples
 
