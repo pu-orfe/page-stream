@@ -17,17 +17,28 @@ fi
 
 LIGHT_NOVNC=${LIGHTWEIGHT_NOVNC:-0}
 
-if [[ "$LIGHT_NOVNC" != "1" ]]; then
-  # Launch Xvfb background (normal mode)
+# SKIP_XVFB: when set to "1" the entrypoint will NOT start Xvfb. This
+# is useful for wrapper scripts that start Xvfb themselves (avoids duplicate
+# Xvfb processes and races). Default behavior (unset or not "1") is to
+# start Xvfb as before.
+if [[ "${SKIP_XVFB:-}" = "1" ]]; then
+  echo "[entrypoint] SKIP_XVFB=1 detected, not starting Xvfb in entrypoint"
   XVFB_W=${WIDTH:-1280}
   XVFB_H=${HEIGHT:-720}
   XVFB_D=${DISPLAY:-:99}
-  Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
-  XVFB_PID=$!
-  trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
 else
-  # In lightweight mode we don't start Xvfb or browser (test mode should skip heavy startup anyway)
-  echo "[lightweight] Skipping Xvfb (test mode)"
+  if [[ "$LIGHT_NOVNC" != "1" ]]; then
+    # Launch Xvfb background (normal mode)
+    XVFB_W=${WIDTH:-1280}
+    XVFB_H=${HEIGHT:-720}
+    XVFB_D=${DISPLAY:-:99}
+    Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
+    XVFB_PID=$!
+    trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
+  else
+    # In lightweight mode we don't start Xvfb or browser (test mode should skip heavy startup anyway)
+    echo "[lightweight] Skipping Xvfb (test mode)"
+  fi
 fi
 
 # Optional noVNC stack
