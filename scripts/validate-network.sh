@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail  # Removed -e to allow functions to return 1 without exiting script
+set -euo pipefail
 
 # ==============================================================================
 # Network Validation Test for page-stream Containers
@@ -213,24 +213,26 @@ echo "========================================================================"
 echo ""
 
 # Test standard-1 (local content)
-test_container_health "standard-1"
-test_srt_connectivity "standard-1" "srt-test-listener" "9001"
-test_content_loaded "${OUT_DIR}/std1.ts" "file:///app/demo/test-standard.html" 50000
+# Run tests but don't let a single failure exit the whole script; failures are
+# counted and reported by the helper functions.
+test_container_health "standard-1" || true
+test_srt_connectivity "standard-1" "srt-test-listener" "9001" || true
+test_content_loaded "${OUT_DIR}/std1.ts" "file:///app/demo/test-standard.html" 50000 || true
 
 echo ""
 
 # Test standard-2 (local content)
-test_container_health "standard-2"
-test_srt_connectivity "standard-2" "srt-test-listener" "9002"
-test_content_loaded "${OUT_DIR}/std2.ts" "file:///app/demo/test-standard.html" 50000
+test_container_health "standard-2" || true
+test_srt_connectivity "standard-2" "srt-test-listener" "9002" || true
+test_content_loaded "${OUT_DIR}/std2.ts" "file:///app/demo/test-standard.html" 50000 || true
 
 echo ""
 
 # Test standard-3 (external content + network access)
-test_container_health "standard-3"
-test_external_network "standard-3"
-test_srt_connectivity "standard-3" "srt-test-listener" "9003"
-test_content_loaded "${OUT_DIR}/std3.ts" "https://example.com" 30000
+test_container_health "standard-3" || true
+test_external_network "standard-3" || true
+test_srt_connectivity "standard-3" "srt-test-listener" "9003" || true
+test_content_loaded "${OUT_DIR}/std3.ts" "https://example.com" 30000 || true
 
 echo ""
 echo "========================================================================"
@@ -240,22 +242,22 @@ echo ""
 
 # Test compositor services (if running)
 if docker ps --filter "name=compositor" --filter "status=running" | grep -q "compositor"; then
-    test_container_health "compositor"
-    test_srt_connectivity "compositor" "srt-ingest" "9000"
+    test_container_health "compositor" || true
+    test_srt_connectivity "compositor" "srt-ingest" "9000" || true
     
     if docker ps --filter "name=source-left" --filter "status=running" | grep -q "source-left"; then
-        test_container_health "source-left"
-        test_srt_connectivity "source-left" "compositor" "10001"
+    test_container_health "source-left" || true
+    test_srt_connectivity "source-left" "compositor" "10001" || true
     fi
     
     if docker ps --filter "name=source-right" --filter "status=running" | grep -q "source-right"; then
-        test_container_health "source-right"
-        test_srt_connectivity "source-right" "compositor" "10002"
+    test_container_health "source-right" || true
+    test_srt_connectivity "source-right" "compositor" "10002" || true
     fi
     
-    if [[ -f "${OUT_DIR}/composite.ts" ]]; then
-        test_content_loaded "${OUT_DIR}/composite.ts" "composite-stream" 60000
-    fi
+        if [[ -f "${OUT_DIR}/composite.ts" ]]; then
+            test_content_loaded "${OUT_DIR}/composite.ts" "composite-stream" 60000 || true
+        fi
 else
     log_info "Compositor stack not running (skipping compositor tests)"
 fi
