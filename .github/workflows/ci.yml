@@ -33,10 +33,24 @@ jobs:
       run: |
         # Fail fast if tests hang in CI: enforce a 6-minute timeout
         # `timeout` returns exit code 124 on timeout.
-        timeout 6m npm test --if-present --silent || {
-          rc=$?
+        # Capture stdout+stderr to a log file so we can upload it if the job times out.
+        LOG=test-output.log
+        # Remove old log if present
+        rm -f "$LOG" || true
+        # Run tests with timeout and tee output to a file for later inspection.
+        timeout 6m npm test --if-present 2>&1 | tee "$LOG" || {
+          rc=${PIPESTATUS[0]:-1}
           if [[ $rc -eq 124 ]]; then
             echo "ERROR: npm test timed out after 6 minutes" >&2
           fi
+          # Still exit with the test command's exit code so the job fails properly.
           exit $rc
         }
+        echo "Test run complete; log at $LOG"
+      
+    - name: Upload test log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-output
+        path: test-output.log
