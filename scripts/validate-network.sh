@@ -64,20 +64,45 @@ test_srt_connectivity() {
     log_info "Testing SRT connectivity: ${container} → ${ingest_host}:${ingest_port}"
     
     # Check container logs for successful SRT connection
-    local srt_output=$(docker logs "${container}" 2>&1 | grep -E "Output #0.*mpegts.*srt://" || true)
-    if [[ -n "${srt_output}" ]]; then
+    # We'll inspect the logs and allow transient errors if a successful
+    # "Output #0 ... mpegts ... srt://" mapping appears after the last error.
+    local logs_file
+    logs_file=$(mktemp)
+    # Capture both stdout and stderr from docker logs into the temp file.
+    # Previous redirection order (2>&1 > file) left stderr on the terminal and
+    # produced an incomplete log file. Use > file 2>&1 to ensure both streams
+    # are written to the file.
+    docker logs "${container}" > "${logs_file}" 2>&1 || true
+
+    local srt_output_line
+    srt_output_line=$(grep -n -E "Output #0.*mpegts.*srt://" "${logs_file}" | tail -n1 | cut -d: -f1 || true)
+    if [[ -n "${srt_output_line}" ]]; then
         log_success "${container}: SRT stream output configured"
     else
         log_error "${container}: No SRT output found in logs"
+        rm -f "${logs_file}"
         return 1
     fi
-    
-    # Check for connection errors in recent logs
-    if docker logs "${container}" 2>&1 | tail -50 | grep -qi "connection.*failed\|input/output error"; then
-        log_error "${container}: Recent SRT connection failures detected"
-        return 1
+
+    # Check for recent connection errors; if present, only fail if no successful
+    # mapping appears after the last error (i.e., the error is persistent).
+    local last_error_line
+    last_error_line=$(grep -n -iE "connection.*failed|input/output error" "${logs_file}" | tail -n1 | cut -d: -f1 || true)
+    if [[ -n "${last_error_line}" ]]; then
+        # If we have a success mapping after the last error, treat as OK
+        if [[ -n "${srt_output_line}" && ${srt_output_line} -gt ${last_error_line} ]]; then
+            log_warn "${container}: Transient SRT connection errors detected but recovered (mapping after last error)"
+            rm -f "${logs_file}"
+            log_success "${container}: SRT connectivity OK"
+            return 0
+        else
+            log_error "${container}: Recent SRT connection failures detected"
+            rm -f "${logs_file}"
+            return 1
+        fi
     fi
-    
+
+    rm -f "${logs_file}"
     log_success "${container}: SRT connectivity OK"
     return 0
 }

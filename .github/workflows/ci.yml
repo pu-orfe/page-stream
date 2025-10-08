@@ -1,17 +1,33 @@
 name: CI
 
+# Run on pushes to any branch (useful for feature branches like stable-compositor)
 on:
+  # Run when commits are pushed to main (final CI for main branch)
   push:
-    branches: [ main ]
+    branches: ['main']
+  # Run for pull request events (useful for feature branches and PR validation)
+  pull_request: {}
+  # Allow manual runs from the Actions UI
+  workflow_dispatch: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Ensure tests run in lightweight test mode and do not start heavy browsers/ffmpeg
+      PAGE_STREAM_TEST_MODE: '1'
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
-    - run: npm ci
-    - run: npm test
+    - name: Quick diagnostics
+      run: |
+        node --version
+        npm --version
+    - name: Install dependencies
+      run: npm ci
+    - name: Run test suite
+      run: npm test --if-present --silent
