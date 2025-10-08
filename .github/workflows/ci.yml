@@ -29,5 +29,14 @@ jobs:
         npm --version
     - name: Install dependencies
       run: npm ci
-    - name: Run test suite
-      run: npm test --if-present --silent
+    - name: Run test suite (with timeout)
+      run: |
+        # Fail fast if tests hang in CI: enforce a 6-minute timeout
+        # `timeout` returns exit code 124 on timeout.
+        timeout 6m npm test --if-present --silent || {
+          rc=$?
+          if [[ $rc -eq 124 ]]; then
+            echo "ERROR: npm test timed out after 6 minutes" >&2
+          fi
+          exit $rc
+        }
