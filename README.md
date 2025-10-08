@@ -30,8 +30,8 @@ Requirements vary depending upon the scale and complexity of deployment, as each
 For the demo:
 
 - Docker
-- 8 CPU Cores (available to Docker)
-- 16GB of RAM (available to Docker)
+- 8 CPU Cores
+- 16GB of RAM
 
 ## Quick Demo
 
@@ -71,7 +71,7 @@ If increasing Colima memory isn't an option, consider reducing per-container res
 
 ## Refreshing the Streamed Page
 
-Manual refresh methods (either works):
+Manual refresh methods:
 
 1. Send `HUP` to the main process (inside container this is PID 1):
    ```bash
@@ -84,7 +84,9 @@ Manual refresh methods (either works):
 
 ### Automatic Periodic Refresh
 
-Add `--auto-refresh-seconds <n>` to automatically reload the page every _n_ seconds (the ffmpeg pipeline is not restarted; only the page is reloaded). Example:
+Add `--auto-refresh-seconds <n>` to automatically reload the page every _n_ seconds.
+
+The ffmpeg pipeline is not restarted; only the page is reloaded). Example:
 
 ```bash
 docker run --rm \
@@ -208,8 +210,6 @@ docker-compose -f docker-compose.stable.yml up -d --build
 
 You should see the demo banner and pulsing H1 from the injected JS/CSS if injection was applied successfully. Check container logs for messages like `[demo-inject] inject.js loaded` in the Chromium console output captured by the Node process.
 
-
-
 ## SRT Examples
 
 Common SRT ingest patterns (change to match your broadcaster):
@@ -239,23 +239,21 @@ Add scaling or overlays via extra args (before output):
 --extra-ffmpeg -vf scale=1920:1080
 ```
 
-## Refresh Strategy
 ## Optional noVNC Viewer
 
-Set `ENABLE_NOVNC=1` to start a lightweight VNC server (`x11vnc`) bound to localhost plus a WebSocket bridge (`websockify`) serving the noVNC client on port `6080` (container). Map the port (`-p 6080:6080`) and open:
+Set `ENABLE_NOVNC=1` to start a lightweight VNC server (`x11vnc`) bound to localhost plus a WebSocket bridge (`websockify`) serving the noVNC client on port `6080` (container).
+
+Map the port (`-p 6080:6080`) and open:
 
 ```
 http://localhost:6080
 ```
 
 Security notes:
-- Disabled by default; requires explicit env var.
-- x11vnc is started with `-localhost` so only accessible via the container network / published port.
-- No password is set (`-nopw`); for production use, consider an authenticating reverse proxy or adding `-passwdfile`.
+- noVNC is disabled by default and requires explicit env var.
+- x11vnc is started with `-localhost` so only accessible via the container network and published port.
+- No password is set (`-nopw`); for production use, consider an authenticating reverse proxy.
 - Intended for short-lived debugging & layout tuning, not for long-term unattended exposure.
-
-
-We reload the Chromium page only, keeping ffmpeg running. This avoids reconnect jitter on ingest.
 
 ## Reconnect & Failure Handling (SRT / RTMP)
 
@@ -270,20 +268,10 @@ Example (finite attempts):
 ffmpeg exited (code=1). Scheduling SRT reconnect attempt 1 in 1000ms
 ffmpeg exited (code=1). Scheduling SRT reconnect attempt 2 in 2000ms
 SRT reconnect attempts exhausted (2/2). Giving up.
-
-SRT connection failed permanently. Troubleshooting suggestions:
-  • Verify the ingest listener is running and accessible: srt://example.com:9000
-  • Confirm any firewalls / security groups allow UDP on the SRT port.
-  • Check that the streamid or query params are correct for the target provider.
-  • Test locally:
-      ffmpeg -loglevel info -f mpegts -i "srt://example.com:9000?streamid=test" -f null -
-  • Or run a local listener:
-      ffmpeg -f mpegts -i "srt://:9000?mode=listener" -f null -
-  • Increase verbosity with: --extra-ffmpeg -loglevel verbose
-  • Enable infinite retries: --reconnect-attempts 0
 ```
 
 ### Choosing Retry Settings
+
 | Scenario | Suggested Flags |
 |----------|-----------------|
 | Unstable network, must persist | `--reconnect-attempts 0 --reconnect-initial-delay-ms 1000 --reconnect-max-delay-ms 30000` |
@@ -349,11 +337,6 @@ conda run -n page-stream-dev npm test
 ```
 
 This reproduces the same steps used by the maintainers for local validation. One caveat: a noVNC-related test may time out if `websockify` or other optional tools are missing; re-run the single test file for diagnostics if needed.
-
-
-## Test Mode (Internal)
-
-Setting `PAGE_STREAM_TEST_MODE=1` skips launching the browser & ffmpeg while still exercising CLI parsing. This is used by the included test suite for fast feedback.
 
 ## Testing
 
