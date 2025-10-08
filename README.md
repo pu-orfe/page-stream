@@ -144,6 +144,18 @@ docker run --rm \
   --ingest srt://host:9000?streamid=demo \
   --url demo/index.html \
   --inject-css /custom.css \
+Per-container injection variables
+-------------------------------
+You can set per-container injection variables in your `.env.stable` (or `.env`) using names
+like `STANDARD_1_INJECT_CSS` / `STANDARD_1_INJECT_JS` or `SOURCE_LEFT_INJECT_CSS`.
+The entrypoint uses the following precedence:
+
+- If `INJECT_CSS` or `INJECT_JS` (global) is set, it is used.
+- Otherwise the entrypoint picks the first non-empty `*_INJECT_CSS` or `*_INJECT_JS` it finds
+  in the container environment and passes it to the `page-stream` CLI as `--inject-css` / `--inject-js`.
+
+This behavior is documented in `scripts/entrypoint.sh` and covered by a small unit test in `tests/inject-vars.test.ts`.
+
   --inject-js /custom.js
 ```
 
