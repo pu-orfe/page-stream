@@ -1,0 +1,253 @@
+services:
+  # ============================================================================
+  # SRT Test Listener (receives standard instance streams for testing)
+  # ============================================================================
+  srt-test-listener:
+    image: linuxserver/ffmpeg:latest
+    container_name: srt-test-listener
+    volumes:
+      - ./out:/out
+      - ./scripts:/out/scripts:ro
+    entrypoint: ["sh","-lc"]
+    command: "/out/scripts/srt-test-listener.sh"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ============================================================================
+  # SRT Ingest Listener (receives final composite)
+  # ============================================================================
+  srt-ingest:
+    image: linuxserver/ffmpeg:latest
+    container_name: srt-ingest
+    volumes:
+      - ./out:/out
+      - ./scripts:/out/scripts:ro
+    networks:
+      - compositor_net
+    entrypoint: ["sh","-lc"]
+    command: "/out/scripts/srt-ingest.sh"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ============================================================================
+  # Compositor (FFmpeg filter_complex: 2 half-width → 1 full HD)
+  # ============================================================================
+  compositor:
+    image: linuxserver/ffmpeg:latest
+    container_name: compositor
+    networks:
+      - compositor_net
+    entrypoint: ["sh","-lc"]
+    volumes:
+      - ./scripts:/out/scripts:ro
+    command: "/out/scripts/compositor.sh"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: on-failure
+
+  # ============================================================================
+  # Half-Width Sources for Compositor (960×1080)
+  # ============================================================================
+  source-left:
+    build: .
+    image: page-stream:latest
+    container_name: source-left
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+      - ./out:/out
+    environment:
+      WIDTH: 960
+      HEIGHT: 1080
+      DISPLAY: ${SOURCE_LEFT_DISPLAY:-:99}
+      # Increased input-side buffers and probe durations to make x11grab more robust
+      # - thread_queue_size: increase packet queue to avoid dropping when ffmpeg is busy
+      # - probesize / analyzeduration: give demuxer more data to estimate frame rate
+      # - rtbufsize: increase input buffer size for transient stalls
+      INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      INJECT_CSS: ${SOURCE_LEFT_INJECT_CSS:-}
+      INJECT_JS: ${SOURCE_LEFT_INJECT_JS:-}
+      FFREPORT_DIR: /out
+      ENABLE_FFREPORT: "1"
+    networks:
+      - compositor_net
+    # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
+    # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
+    command:
+      - "--ingest"
+      - "srt://compositor:10001?streamid=left&latency=10000"
+      - "--url"
+      - "${SOURCE_LEFT_URL:-file:///app/demo/test-left.html}"
+      - "--auto-refresh-seconds"
+      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+
+  source-right:
+    image: page-stream:latest
+    container_name: source-right
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+      - ./out:/out
+    environment:
+      WIDTH: 960
+      HEIGHT: 1080
+      DISPLAY: ${SOURCE_RIGHT_DISPLAY:-:100}
+      # Increased input-side buffers and probe durations to make x11grab more robust
+      # See notes above in source-left for rationale
+      INPUT_FFMPEG_FLAGS: "-thread_queue_size 2048 -probesize 20M -analyzeduration 4M -rtbufsize 400M"
+      INJECT_CSS: ${SOURCE_RIGHT_INJECT_CSS:-}
+      INJECT_JS: ${SOURCE_RIGHT_INJECT_JS:-}
+      FFREPORT_DIR: /out
+      ENABLE_FFREPORT: "1"
+    networks:
+      - compositor_net
+    # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
+    # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
+    command:
+      - "--ingest"
+      - "srt://compositor:10002?streamid=right&latency=10000"
+      - "--url"
+      - "${SOURCE_RIGHT_URL:-file:///app/demo/test-right.html}"
+      - "--auto-refresh-seconds"
+      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+
+  # ============================================================================
+  # Standard Streaming Instances (1920×1080, isolated from compositor)
+  # ============================================================================
+  standard-1:
+    image: page-stream:latest
+    container_name: standard-1
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=${STANDARD_1_DISPLAY:-:104}
+      - INJECT_CSS=${STANDARD_1_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_1_INJECT_JS:-}
+    # No networks declaration = joins default network only
+    depends_on:
+      srt-test-listener:
+        condition: service_healthy
+    # Use STANDARD_1_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1} --url ${STANDARD_1_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  standard-2:
+    image: page-stream:latest
+    container_name: standard-2
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=${STANDARD_2_DISPLAY:-:105}
+      - INJECT_CSS=${STANDARD_2_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_2_INJECT_JS:-}
+    depends_on:
+      srt-test-listener:
+        condition: service_healthy
+    # Use STANDARD_2_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_2_INGEST:-srt://srt-test-listener:9002?streamid=std2} --url ${STANDARD_2_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  standard-3:
+    image: page-stream:latest
+    container_name: standard-3
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=${STANDARD_3_DISPLAY:-:106}
+      - INJECT_CSS=${STANDARD_3_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_3_INJECT_JS:-}
+    depends_on:
+      srt-test-listener:
+        condition: service_healthy
+    # Use STANDARD_3_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_3_INGEST:-srt://srt-test-listener:9003?streamid=std3} --url ${STANDARD_3_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  standard-4:
+    image: page-stream:latest
+    container_name: standard-4
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=${STANDARD_4_DISPLAY:-:107}
+      - INJECT_CSS=${STANDARD_4_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_4_INJECT_JS:-}
+    depends_on:
+      srt-test-listener:
+        condition: service_healthy
+    # Use STANDARD_4_URL from .env.stable (falls back to demo page if unset)
+    command: "--ingest ${STANDARD_4_INGEST:-srt://srt-test-listener:9004?streamid=std4} --url ${STANDARD_4_URL:-file:///app/demo/test-standard.html} --auto-refresh-seconds ${DEFAULT_REFRESH_INTERVAL:-3600}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+networks:
+  compositor_net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-compositor

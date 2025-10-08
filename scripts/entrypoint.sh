@@ -17,17 +17,28 @@ fi
 
 LIGHT_NOVNC=${LIGHTWEIGHT_NOVNC:-0}
 
-if [[ "$LIGHT_NOVNC" != "1" ]]; then
-  # Launch Xvfb background (normal mode)
+# SKIP_XVFB: when set to "1" the entrypoint will NOT start Xvfb. This
+# is useful for wrapper scripts that start Xvfb themselves (avoids duplicate
+# Xvfb processes and races). Default behavior (unset or not "1") is to
+# start Xvfb as before.
+if [[ "${SKIP_XVFB:-}" = "1" ]]; then
+  echo "[entrypoint] SKIP_XVFB=1 detected, not starting Xvfb in entrypoint"
   XVFB_W=${WIDTH:-1280}
   XVFB_H=${HEIGHT:-720}
   XVFB_D=${DISPLAY:-:99}
-  Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
-  XVFB_PID=$!
-  trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
 else
-  # In lightweight mode we don't start Xvfb or browser (test mode should skip heavy startup anyway)
-  echo "[lightweight] Skipping Xvfb (test mode)"
+  if [[ "$LIGHT_NOVNC" != "1" ]]; then
+    # Launch Xvfb background (normal mode)
+    XVFB_W=${WIDTH:-1280}
+    XVFB_H=${HEIGHT:-720}
+    XVFB_D=${DISPLAY:-:99}
+    Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
+    XVFB_PID=$!
+    trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
+  else
+    # In lightweight mode we don't start Xvfb or browser (test mode should skip heavy startup anyway)
+    echo "[lightweight] Skipping Xvfb (test mode)"
+  fi
 fi
 
 # Optional noVNC stack
@@ -88,6 +99,77 @@ REDIR
       echo "[noVNC] WARNING: readiness probe timed out" >&2
     fi
   done
+fi
+
+# If per-container inject environment variables are set, append them to the
+# arguments passed to the node process. This keeps compose files simple and
+# avoids having to craft complex conditional command lines in docker-compose.
+#
+# Supports variables named like: STANDARD_1_INJECT_CSS, SOURCE_LEFT_INJECT_JS,
+# etc. For each non-empty *_INJECT_CSS / *_INJECT_JS we append the corresponding
+# --inject-css / --inject-js option. This also remains backwards-compatible
+# with the older single INJECT_CSS / INJECT_JS env vars.
+
+# Determine a single CSS injection source.
+# Priority: explicit INJECT_CSS env var > first non-empty *_INJECT_CSS found in environment.
+inject_css_val=""
+if [[ -n "${INJECT_CSS:-}" ]]; then
+  inject_css_val="${INJECT_CSS}"
+  echo "[entrypoint] INJECT_CSS detected, will inject --inject-css ${inject_css_val}" >&2
+else
+  css_found=()
+  for name in $(compgen -v); do
+    case "$name" in
+      *_INJECT_CSS)
+        val="${!name:-}"
+        if [[ -n "$val" ]]; then
+          css_found+=("$name:$val")
+        fi
+        ;;
+    esac
+  done
+  if [[ ${#css_found[@]} -gt 0 ]]; then
+    # Use the first found value; warn if multiple present
+    first="${css_found[0]}"
+    inject_css_val="${first#*:}"
+    echo "[entrypoint] Found per-container INJECT_CSS env(s): ${css_found[*]}. Using ${inject_css_val}" >&2
+    if [[ ${#css_found[@]} -gt 1 ]]; then
+      echo "[entrypoint] WARNING: multiple *_INJECT_CSS variables set; only the first will be used" >&2
+    fi
+  fi
+fi
+if [[ -n "$inject_css_val" ]]; then
+  set -- "$@" "--inject-css" "$inject_css_val"
+fi
+
+# Determine a single JS injection source (same priority as CSS)
+inject_js_val=""
+if [[ -n "${INJECT_JS:-}" ]]; then
+  inject_js_val="${INJECT_JS}"
+  echo "[entrypoint] INJECT_JS detected, will inject --inject-js ${inject_js_val}" >&2
+else
+  js_found=()
+  for name in $(compgen -v); do
+    case "$name" in
+      *_INJECT_JS)
+        val="${!name:-}"
+        if [[ -n "$val" ]]; then
+          js_found+=("$name:$val")
+        fi
+        ;;
+    esac
+  done
+  if [[ ${#js_found[@]} -gt 0 ]]; then
+    first="${js_found[0]}"
+    inject_js_val="${first#*:}"
+    echo "[entrypoint] Found per-container INJECT_JS env(s): ${js_found[*]}. Using ${inject_js_val}" >&2
+    if [[ ${#js_found[@]} -gt 1 ]]; then
+      echo "[entrypoint] WARNING: multiple *_INJECT_JS variables set; only the first will be used" >&2
+    fi
+  fi
+fi
+if [[ -n "$inject_js_val" ]]; then
+  set -- "$@" "--inject-js" "$inject_js_val"
 fi
 
 # Start node process

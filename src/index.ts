@@ -192,8 +192,17 @@ export class PageStreamer {
   buildFfmpegArgs(): string[] {
     // Build ffmpeg command with correct ordering: all inputs first, then encoding/output options.
     const { width, height, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg } = this.opts;
-    const display = process.env.DISPLAY || ':99';
+  const display = process.env.DISPLAY || ':99';
+  // Allow input-level tuning flags via environment variable (space-separated),
+  // e.g. INPUT_FFMPEG_FLAGS='-thread_queue_size 512 -probesize 5M'
+  const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
+  const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
     const args: string[] = [
+      // Improve robustness of the X11 input capture by adding input-side options
+      // before the x11grab input. These reduce dropped frames under load in VM
+      // environments (thread queue, larger probe/analyze sizes).
+      // Input-level tuning (user-visible values as recommended):
+  ...inputFlags,
       // Video input (X11)
       '-f','x11grab',
       '-framerate', String(fps),
@@ -244,7 +253,18 @@ export class PageStreamer {
 
   async launchFfmpeg() {
     const args = this.buildFfmpegArgs();
-    const child = spawn('ffmpeg', args, { stdio: ['ignore','inherit','inherit'] });
+    // Support writing ffmpeg report files inside the container by setting
+    // FFREPORT_DIR to a writable path (e.g. /out) or enabling ENABLE_FFREPORT=1.
+    // When enabled we set FFREPORT=file=<dir>/ffreport-PID-TIMESTAMP.log:level=32
+    const ffreportDir = process.env.FFREPORT_DIR || '/out';
+    const enableReport = (process.env.ENABLE_FFREPORT === '1') || !!process.env.FFREPORT_DIR;
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (enableReport) {
+      const stamp = Date.now();
+      env.FFREPORT = `file=${ffreportDir}/ffreport-${process.pid}-${stamp}.log:level=32`;
+      console.log('[ffmpeg-report] FFREPORT set to', env.FFREPORT);
+    }
+    const child = spawn('ffmpeg', args, { stdio: ['ignore','inherit','inherit'], env });
     this.ff = child as unknown as ChildProcessWithoutNullStreams; // relaxed cast
     child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
       console.log(`ffmpeg exited code=${code} signal=${signal}`);
@@ -521,6 +541,9 @@ async function main() {
     .parse(process.argv);
 
   const opts = program.opts();
+  // CLI flags --inject-css/--inject-js may be omitted; allow environment fallback
+  if (!opts.injectCss && process.env.INJECT_CSS) opts.injectCss = process.env.INJECT_CSS;
+  if (!opts.injectJs && process.env.INJECT_JS) opts.injectJs = process.env.INJECT_JS;
   // Automatic display size fallback: If env WIDTH/HEIGHT (Xvfb) differ from requested capture size,
   // override the CLI width/height to prevent x11grab mismatch errors.
   const envW = process.env.WIDTH ? parseInt(process.env.WIDTH,10) : undefined;

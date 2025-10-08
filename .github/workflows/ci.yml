@@ -1,17 +1,56 @@
 name: CI
 
+# Run on pushes to any branch (useful for feature branches like stable-compositor)
 on:
+  # Run when commits are pushed to main (final CI for main branch)
   push:
-    branches: [ main ]
+    branches: ['main']
+  # Run for pull request events (useful for feature branches and PR validation)
+  pull_request: {}
+  # Allow manual runs from the Actions UI
+  workflow_dispatch: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Ensure tests run in lightweight test mode and do not start heavy browsers/ffmpeg
+      PAGE_STREAM_TEST_MODE: '1'
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
-    - run: npm ci
-    - run: npm test
+    - name: Quick diagnostics
+      run: |
+        node --version
+        npm --version
+    - name: Install dependencies
+      run: npm ci
+    - name: Run test suite (with timeout)
+      run: |
+        # Fail fast if tests hang in CI: enforce a 6-minute timeout
+        # `timeout` returns exit code 124 on timeout.
+        # Capture stdout+stderr to a log file so we can upload it if the job times out.
+        LOG=test-output.log
+        # Remove old log if present
+        rm -f "$LOG" || true
+        # Run tests with timeout and tee output to a file for later inspection.
+        timeout 6m npm test --if-present 2>&1 | tee "$LOG" || {
+          rc=${PIPESTATUS[0]:-1}
+          if [[ $rc -eq 124 ]]; then
+            echo "ERROR: npm test timed out after 6 minutes" >&2
+          fi
+          # Still exit with the test command's exit code so the job fails properly.
+          exit $rc
+        }
+        echo "Test run complete; log at $LOG"
+      
+    - name: Upload test log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-output
+        path: test-output.log
