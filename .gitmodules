@@ -1,0 +1,3 @@
+[submodule "orfe"]
+	path = orfe
+	url = git@github.com:princeton-orfe/page-stream-config.git
