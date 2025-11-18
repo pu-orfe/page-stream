@@ -40,13 +40,16 @@ Copy the example `.env.stable.example` to `.env`.  Edit `.env`, setting your own
 - `STANDARD_1_URL`, etc — the target HTTP(S) pages streamed by the `standard-*`, full screen (HD) services.
 - `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width (HD) source pages used by the example compositor.
 
+**For production with secret stream IDs (Kaltura, etc)**: If your stream IDs contain `#` characters, see [`SECRETS.md`](SECRETS.md) for proper configuration using `.env.secrets.sh`.
+
 Make sure no existing stack is up, build the image, then bring up the stack!
 
 Example streams that you can open with VLC, `ffplay`, etc will appear in the `out` folder.
 
 ```bash
-docker-compose build -t page-stream:latest .
+docker build -t page-stream:latest .
 docker-compose -f docker-compose.stable.yml down
+# For production with secret stream IDs: source .env.secrets.sh first
 docker-compose -f docker-compose.stable.yml up -d --build
 ```
 
