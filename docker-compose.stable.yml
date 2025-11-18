@@ -50,6 +50,8 @@ services:
     entrypoint: ["sh","-lc"]
     volumes:
       - ./scripts:/out/scripts:ro
+    environment:
+      - COMPOSITOR_INGEST=${COMPOSITOR_INGEST:-srt://srt-ingest:9000?streamid=composite}
     command: "/out/scripts/compositor.sh"
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg"]
@@ -237,6 +239,9 @@ services:
       - DISPLAY=${STANDARD_4_DISPLAY:-:107}
       - INJECT_CSS=${STANDARD_4_INJECT_CSS:-}
       - INJECT_JS=${STANDARD_4_INJECT_JS:-}
+      - ENABLE_NOVNC=1
+    ports:
+      - "6080:6080"
     depends_on:
       srt-test-listener:
         condition: service_healthy
