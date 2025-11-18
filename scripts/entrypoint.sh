@@ -35,6 +35,20 @@ else
     Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
     XVFB_PID=$!
     trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
+
+    # Wait for Xvfb to be ready before continuing
+    echo "[entrypoint] Waiting for Xvfb display $XVFB_D to be ready..." >&2
+    for i in {1..600}; do
+      if xdpyinfo -display "$XVFB_D" >/dev/null 2>&1; then
+        echo "[entrypoint] Xvfb ready (after ${i} attempts)" >&2
+        break
+      fi
+      sleep 0.1
+      if [[ $i -eq 600 ]]; then
+        echo "[entrypoint] ERROR: Xvfb failed to start within 60 seconds" >&2
+        exit 1
+      fi
+    done
   else
     # In lightweight mode we don't start Xvfb or browser (test mode should skip heavy startup anyway)
     echo "[lightweight] Skipping Xvfb (test mode)"

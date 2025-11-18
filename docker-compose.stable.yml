@@ -87,6 +87,9 @@ services:
       ENABLE_FFREPORT: "1"
     networks:
       - compositor_net
+    depends_on:
+      compositor:
+        condition: service_healthy
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
     # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
@@ -126,6 +129,9 @@ services:
       ENABLE_FFREPORT: "1"
     networks:
       - compositor_net
+    depends_on:
+      compositor:
+        condition: service_healthy
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
     # Command: ingest URL and refresh interval (input tuning comes from INPUT_FFMPEG_FLAGS env)
     command:
