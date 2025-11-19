@@ -1,5 +1,31 @@
 services:
   # ============================================================================
+  # System Requirements Check (validates Docker has sufficient resources)
+  # ============================================================================
+  requirements-check:
+    image: alpine:latest
+    container_name: requirements-check
+    volumes:
+      - ./scripts:/scripts:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    entrypoint: ["sh", "-c"]
+    command: >
+      if [ "$${SKIP_REQUIREMENTS_CHECK:-false}" = "true" ]; then
+        echo "System requirements check skipped (SKIP_REQUIREMENTS_CHECK=true)";
+        exit 0;
+      else
+        /scripts/check-system-requirements.sh;
+      fi
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
+      timeout: 10s
+      retries: 1
+      start_period: 5s
+    restart: "no"
+
+  # ============================================================================
   # SRT Test Listener (receives standard instance streams for testing)
   # ============================================================================
   srt-test-listener:
@@ -10,6 +36,9 @@ services:
       - ./scripts:/out/scripts:ro
     entrypoint: ["sh","-lc"]
     command: "/out/scripts/srt-test-listener.sh"
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pgrep ffmpeg || exit 1"]
       interval: 5s
@@ -29,6 +58,9 @@ services:
       - ./scripts:/out/scripts:ro
     networks:
       - compositor_net
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
     entrypoint: ["sh","-lc"]
     command: "/out/scripts/srt-ingest.sh"
     healthcheck:
@@ -47,6 +79,9 @@ services:
     container_name: compositor
     networks:
       - compositor_net
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
     entrypoint: ["sh","-lc"]
     volumes:
       - ./scripts:/out/scripts:ro
@@ -88,6 +123,8 @@ services:
     networks:
       - compositor_net
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       compositor:
         condition: service_healthy
     # Use SOURCE_LEFT_URL from .env.stable (falls back to demo page if unset)
@@ -130,6 +167,8 @@ services:
     networks:
       - compositor_net
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       compositor:
         condition: service_healthy
     # Use SOURCE_RIGHT_URL from .env.stable (falls back to demo page if unset)
@@ -168,6 +207,8 @@ services:
       - INJECT_JS=${STANDARD_1_INJECT_JS:-}
     # No networks declaration = joins default network only
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       srt-test-listener:
         condition: service_healthy
     # Use STANDARD_1_URL from .env.stable (falls back to demo page if unset)
@@ -201,6 +242,8 @@ services:
       - INJECT_CSS=${STANDARD_2_INJECT_CSS:-}
       - INJECT_JS=${STANDARD_2_INJECT_JS:-}
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       srt-test-listener:
         condition: service_healthy
     # Use STANDARD_2_URL from .env.stable (falls back to demo page if unset)
@@ -234,6 +277,8 @@ services:
       - INJECT_CSS=${STANDARD_3_INJECT_CSS:-}
       - INJECT_JS=${STANDARD_3_INJECT_JS:-}
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       srt-test-listener:
         condition: service_healthy
     # Use STANDARD_3_URL from .env.stable (falls back to demo page if unset)
@@ -273,6 +318,8 @@ services:
     ports:
       - "6080:6080"
     depends_on:
+      requirements-check:
+        condition: service_completed_successfully
       srt-test-listener:
         condition: service_healthy
     # Use STANDARD_4_URL from .env.stable (falls back to demo page if unset)
