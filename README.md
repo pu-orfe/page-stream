@@ -23,15 +23,17 @@ Page Stream loads a supplied URL or local HTML in Playwright-controlled Chromium
 5. A `SIGHUP` to the Node process (or container) triggers a page reload only.
 
 
-## Minimal Requirements 
+## Minimal Requirements
 
 Requirements vary depending upon the scale and complexity of deployment, as each instance is running, at a minimum, a framebuffer, a browser, and a real-time HD (or greater!) encode to stream.
 
 For the demo:
 
 - Docker
-- 8 CPU Cores
-- 16GB of RAM
+- 6 CPU Cores (minimum)
+- 16GB of RAM (minimum)
+
+**Automatic Requirements Check:** When starting the stack with `docker-compose`, an automatic system requirements check will verify that your Docker environment has sufficient resources allocated. If requirements aren't met, the stack will fail to start with helpful instructions on how to allocate more resources. To disable this check, set `SKIP_REQUIREMENTS_CHECK=true` in your `.env` file.
 
 ## Quick Demo
 
@@ -40,19 +42,26 @@ Copy the example `.env.stable.example` to `.env`.  Edit `.env`, setting your own
 - `STANDARD_1_URL`, etc — the target HTTP(S) pages streamed by the `standard-*`, full screen (HD) services.
 - `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width (HD) source pages used by the example compositor.
 
+**For production with secret stream IDs (Kaltura, etc)**: If your stream IDs contain `#` characters, see [`SECRETS.md`](SECRETS.md) for proper configuration using `.env.secrets.sh`.
+
 Make sure no existing stack is up, build the image, then bring up the stack!
 
 Example streams that you can open with VLC, `ffplay`, etc will appear in the `out` folder.
 
 ```bash
-docker-compose build -t page-stream:latest .
+docker build -t page-stream:latest .
 docker-compose -f docker-compose.stable.yml down
+# For production with secret stream IDs: source .env.secrets.sh first
 docker-compose -f docker-compose.stable.yml up -d --build
 ```
 
-## Resource Constraints 
+## Resource Constraints
 
 The project tests with Colima as the macOS Docker runtime, and the default VM memory and CPU allocations to Colima are too small (OOMKilled, Exit Code 137 errors).
+
+An automatic system requirements check runs when you start the stack to verify sufficient resources are available. The minimum requirements are:
+- **6 CPU cores**
+- **16GB RAM**
 
 1. Check current Colima status and resources:
 
@@ -64,10 +73,19 @@ colima status
 
 ```bash
 colima stop
-colima start --cpu 8 --memory 16g 
+colima start --cpu 6 --memory 16
+```
+
+For better performance with the full demo stack (recommended):
+
+```bash
+colima stop
+colima start --cpu 8 --memory 16
 ```
 
 If increasing Colima memory isn't an option, consider reducing per-container resource use (lower resolution/bitrate) or running fewer concurrent standard instances.
+
+**Note:** To bypass the requirements check (not recommended), set `SKIP_REQUIREMENTS_CHECK=true` in your `.env` file.
 
 ## Refreshing the Streamed Page
 

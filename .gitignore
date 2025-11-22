@@ -6,3 +6,4 @@ npm-debug.log*
 docker-compose.yml
 .env
 out/
+.env.secrets.sh

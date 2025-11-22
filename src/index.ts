@@ -86,6 +86,8 @@ export class PageStreamer {
       ] : [])
     ];
     const startUrl = this.toFileUrlIfNeeded(this.opts.url);
+    const PAGE_LOAD_TIMEOUT_MS = 30000; // 30 seconds
+
     if (this.opts.appMode) {
       // Use persistent context so Chromium honors --app without spawning an unattached window.
       this.userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pgstream-')); // ephemeral profile
@@ -109,7 +111,19 @@ export class PageStreamer {
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
         pageFound = await this.persistentContext.newPage();
-        await pageFound.goto(startUrl);
+        console.log(`[page-load] Loading page: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
+        try {
+          await pageFound.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+          console.log('[page-load] Page loaded successfully');
+        } catch (err: any) {
+          if (err.name === 'TimeoutError') {
+            console.warn(`[page-load] WARNING: Page load timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
+            console.warn(`[page-load] URL: ${startUrl}`);
+            console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
+          } else {
+            throw err;
+          }
+        }
       }
       this.page = pageFound;
       // Expose browser object for unified shutdown logic
@@ -124,7 +138,19 @@ export class PageStreamer {
       // Inject visibility override early via init script
       await ctx.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       this.page = await ctx.newPage();
-      await this.page.goto(startUrl);
+      console.log(`[page-load] Loading page: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
+      try {
+        await this.page.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+        console.log('[page-load] Page loaded successfully');
+      } catch (err: any) {
+        if (err.name === 'TimeoutError') {
+          console.warn(`[page-load] WARNING: Page load timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
+          console.warn(`[page-load] URL: ${startUrl}`);
+          console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
+        } else {
+          throw err;
+        }
+      }
     }
     // Inject custom content
     await this.injectCustomContent(this.page);
@@ -278,11 +304,21 @@ export class PageStreamer {
     this.refreshing = true;
     try {
       if (!this.page) return;
-      console.log('Refreshing streamed page...');
-      await this.page.reload({ waitUntil: 'networkidle' });
+      const PAGE_LOAD_TIMEOUT_MS = 30000; // 30 seconds
+      console.log('[page-load] Refreshing streamed page...');
+      try {
+        await this.page.reload({ timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+        console.log('[page-load] Refresh complete.');
+      } catch (err: any) {
+        if (err.name === 'TimeoutError') {
+          console.warn(`[page-load] WARNING: Page refresh timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
+          console.warn('[page-load] Continuing with partial page load');
+        } else {
+          throw err;
+        }
+      }
       // Re-inject custom content after reload
       await this.injectCustomContent(this.page);
-      console.log('Refresh complete.');
     } finally {
       this.refreshing = false;
     }
