@@ -340,6 +340,53 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # ============================================================================
+  # Video File Loop Example (direct video streaming without browser)
+  # ============================================================================
+  # This service demonstrates direct video file streaming without launching
+  # a browser or Xvfb. Mount your video file and set VIDEO_FILE_PATH.
+  #
+  # Usage:
+  #   VIDEO_FILE_PATH=/path/to/video.mp4 docker compose -f docker-compose.stable.yml up video-loop
+  #
+  video-loop:
+    image: page-stream:latest
+    container_name: video-loop
+    profiles:
+      - video-loop
+    volumes:
+      - ./out:/out
+      - ${VIDEO_FILE_PATH:-./demo/sample.mp4}:/video/input.mp4:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
+      srt-test-listener:
+        condition: service_healthy
+    command:
+      - "--ingest"
+      - "${VIDEO_LOOP_INGEST:-srt://srt-test-listener:9001?streamid=videoloop}"
+      - "--video-file"
+      - "/video/input.mp4"
+      - "--video-loop"
+      - "--width"
+      - "1920"
+      - "--height"
+      - "1080"
+      - "--fps"
+      - "30"
+      - "--video-bitrate"
+      - "5000k"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
 networks:
   compositor_net:
     driver: bridge

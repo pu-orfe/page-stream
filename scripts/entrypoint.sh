@@ -21,7 +21,24 @@ LIGHT_NOVNC=${LIGHTWEIGHT_NOVNC:-0}
 # is useful for wrapper scripts that start Xvfb themselves (avoids duplicate
 # Xvfb processes and races). Default behavior (unset or not "1") is to
 # start Xvfb as before.
-if [[ "${SKIP_XVFB:-}" = "1" ]]; then
+#
+# VIDEO_FILE: when set, we're in direct video file mode and don't need Xvfb.
+# Also check CLI args for --video-file flag.
+video_file_mode=0
+if [[ -n "${VIDEO_FILE:-}" ]]; then
+  video_file_mode=1
+fi
+# Check CLI args for --video-file
+for arg in "$@"; do
+  if [[ "$arg" == "--video-file" ]]; then
+    video_file_mode=1
+    break
+  fi
+done
+
+if [[ "$video_file_mode" = "1" ]]; then
+  echo "[entrypoint] Video file mode detected, skipping Xvfb"
+elif [[ "${SKIP_XVFB:-}" = "1" ]]; then
   echo "[entrypoint] SKIP_XVFB=1 detected, not starting Xvfb in entrypoint"
   XVFB_W=${WIDTH:-1280}
   XVFB_H=${HEIGHT:-720}
