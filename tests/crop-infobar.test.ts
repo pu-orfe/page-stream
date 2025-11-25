@@ -28,6 +28,7 @@ test('ffmpeg args include crop filter when --crop-infobar set and no user filter
     suppressAutomationBanner: true,
     autoDismissInfobar: false,
     cropInfobar: 40,
+    videoLoop: false,
   });
   const args = streamer.buildFfmpegArgs();
   const vfIndex = args.indexOf('-vf');
@@ -59,6 +60,7 @@ test('crop filter skipped when user supplies -vf manually', () => {
     suppressAutomationBanner: true,
     autoDismissInfobar: false,
     cropInfobar: 50,
+    videoLoop: false,
   });
   const args = streamer.buildFfmpegArgs();
   // Ensure our scale filter remains and we did not insert another -vf later (ffmpeg would apply last one)
