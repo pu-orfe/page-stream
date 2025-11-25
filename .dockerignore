@@ -1,0 +1,28 @@
+# Build artifacts (dist is generated inside container)
+dist
+node_modules
+
+# Output files
+out/
+
+# Video files (mounted at runtime)
+videos/
+
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.stable.example
+
+# IDE / OS
+.DS_Store
+.vscode
+.idea
+*.swp
+
+# Docker files (not needed in image)
+docker-compose*.yml
+Dockerfile

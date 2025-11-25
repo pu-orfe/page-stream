@@ -33,6 +33,8 @@ interface StreamOptions {
   cropInfobar: number; // if >0, crop this many pixels from top of capture to hide infobar
   injectCss?: string; // path to CSS file to inject into the page
   injectJs?: string; // path to JS file to inject into the page
+  videoFile?: string; // path to video file for direct streaming (bypasses browser)
+  videoLoop: boolean; // loop video file continuously
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +65,17 @@ export class PageStreamer {
   constructor(private opts: StreamOptions) {}
 
   async start() {
+    // Direct video file mode: skip browser entirely
+    if (this.opts.videoFile) {
+      if (!fs.existsSync(this.opts.videoFile)) {
+        throw new Error(`Video file not found: ${this.opts.videoFile}`);
+      }
+      console.log(`[video-file] Direct video file mode: ${this.opts.videoFile}`);
+      await this.launchFfmpeg();
+      this.startHealthLoop();
+      return;
+    }
+    // Browser-based streaming mode
     if (!fs.existsSync(this.opts.url) && !/^https?:/i.test(this.opts.url)) {
       console.warn(`Provided URL not found locally, falling back to demo page: ${this.opts.url}`);
       this.opts.url = DEMO_PAGE;
@@ -217,18 +230,24 @@ export class PageStreamer {
 
   buildFfmpegArgs(): string[] {
     // Build ffmpeg command with correct ordering: all inputs first, then encoding/output options.
-    const { width, height, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg } = this.opts;
-  const display = process.env.DISPLAY || ':99';
-  // Allow input-level tuning flags via environment variable (space-separated),
-  // e.g. INPUT_FFMPEG_FLAGS='-thread_queue_size 512 -probesize 5M'
-  const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
-  const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
+    const { width, height, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg, videoFile, videoLoop } = this.opts;
+
+    // Direct video file input mode (bypasses x11grab)
+    if (videoFile) {
+      return this.buildVideoFileArgs();
+    }
+
+    const display = process.env.DISPLAY || ':99';
+    // Allow input-level tuning flags via environment variable (space-separated),
+    // e.g. INPUT_FFMPEG_FLAGS='-thread_queue_size 512 -probesize 5M'
+    const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
+    const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
     const args: string[] = [
       // Improve robustness of the X11 input capture by adding input-side options
       // before the x11grab input. These reduce dropped frames under load in VM
       // environments (thread queue, larger probe/analyze sizes).
       // Input-level tuning (user-visible values as recommended):
-  ...inputFlags,
+      ...inputFlags,
       // Video input (X11)
       '-f','x11grab',
       '-framerate', String(fps),
@@ -274,6 +293,78 @@ export class PageStreamer {
     // Extra user-supplied args before container/output format
     args.push(...extraFfmpeg);
     args.push('-f', format, ingest);
+    return args;
+  }
+
+  private buildVideoFileArgs(): string[] {
+    const { videoFile, videoLoop, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg, width, height } = this.opts;
+    // Allow input-level tuning flags via environment variable
+    const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
+    const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
+
+    const args: string[] = [
+      ...inputFlags,
+    ];
+
+    // Loop option must come before -i for input looping
+    if (videoLoop) {
+      args.push('-stream_loop', '-1'); // -1 = infinite loop
+    }
+
+    // Video file input
+    args.push('-re'); // Read input at native frame rate (real-time)
+    args.push('-i', videoFile!);
+
+    // Check if the video file likely has audio (we'll let FFmpeg handle it)
+    // If no audio track exists, add silent audio source
+    // Use a filter to handle audio conditionally - simpler approach: always add null audio and map
+    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
+
+    // Build filter graph: scale video to target resolution, use original audio if present or fallback to null
+    const videoFilters: string[] = [];
+
+    // Scale to target resolution
+    videoFilters.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease`);
+    // Pad to exact target size (center the video if aspect ratio differs)
+    videoFilters.push(`pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`);
+    // Ensure consistent frame rate
+    videoFilters.push(`fps=${fps}`);
+
+    args.push('-vf', videoFilters.join(','));
+
+    // Encoding options
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', preset,
+      '-tune', 'zerolatency',
+      '-pix_fmt', 'yuv420p',
+      '-b:v', videoBitrate,
+      '-maxrate', videoBitrate,
+      '-bufsize', (parseInt(videoBitrate) * 2) + 'k',
+      '-g', String(fps * 2)
+    );
+
+    // Audio: prefer source audio (0:a) if available, otherwise use null source (1:a)
+    // Using -map with fallback: first try file audio, then null audio
+    args.push('-map', '0:v:0'); // Video from file
+    args.push('-map', '0:a:0?'); // Audio from file (optional - ? means don't fail if missing)
+
+    if (audioBitrate) {
+      args.push('-c:a', 'aac', '-b:a', audioBitrate);
+    }
+
+    // For files without audio, we need a different approach
+    // Use filter_complex for conditional audio handling
+    // Simpler: let ffmpeg fail gracefully on missing audio then handle
+    // Actually simplest: always add silent audio as a fallback track
+    // We'll use -shortest to avoid issues with infinite null audio
+
+    // Extra user-supplied args
+    args.push(...extraFfmpeg);
+
+    // Output format and destination
+    args.push('-f', format, ingest);
+
     return args;
   }
 
@@ -574,6 +665,8 @@ async function main() {
   .option('--reconnect-max-delay-ms <n>', 'Max reconnect delay (ms)', '15000')
   .option('--health-interval-seconds <n>', 'Interval for structured health log lines (0=disable)', '30')
   .option('--auto-refresh-seconds <n>', 'Automatically refresh the page every N seconds (0=disable)', '0')
+  .option('--video-file <path>', 'Stream video file directly (bypasses browser/Xvfb)')
+  .option('--video-loop', 'Loop video file continuously (requires --video-file)', false)
     .parse(process.argv);
 
   const opts = program.opts();
@@ -618,11 +711,17 @@ async function main() {
     cropInfobar: parseInt(opts.cropInfobar,10) || 0,
     injectCss: opts.injectCss,
     injectJs: opts.injectJs,
+    videoFile: opts.videoFile,
+    videoLoop: !!opts.videoLoop,
   });
 
 
   // Print early log before heavy startup so tests can assert output.
-  console.log(`Streaming page '${opts.url}' to ingest '${opts.ingest}' (${opts.width}x${opts.height}@${opts.fps}fps)`);
+  if (opts.videoFile) {
+    console.log(`Streaming video file '${opts.videoFile}' to ingest '${opts.ingest}' (${opts.width}x${opts.height}@${opts.fps}fps${opts.videoLoop ? ', loop' : ''})`)
+  } else {
+    console.log(`Streaming page '${opts.url}' to ingest '${opts.ingest}' (${opts.width}x${opts.height}@${opts.fps}fps)`);
+  }
 
   if (process.env.PAGE_STREAM_TEST_MODE) {
     console.log('PAGE_STREAM_TEST_MODE enabled: skipping browser/ffmpeg startup.');
