@@ -344,10 +344,14 @@ services:
   # Video File Loop Example (direct video streaming without browser)
   # ============================================================================
   # This service demonstrates direct video file streaming without launching
-  # a browser or Xvfb. Mount your video file and set VIDEO_FILE_PATH.
+  # a browser or Xvfb. Place your video file in the ./videos/ directory.
   #
   # Usage:
-  #   VIDEO_FILE_PATH=/path/to/video.mp4 docker compose -f docker-compose.stable.yml up video-loop
+  #   1. Copy your video to ./videos/input.mp4
+  #   2. docker compose -f docker-compose.stable.yml --profile video-loop up video-loop
+  #
+  # Or specify a custom filename:
+  #   VIDEO_FILENAME=my-video.mp4 docker compose -f docker-compose.stable.yml --profile video-loop up video-loop
   #
   video-loop:
     image: page-stream:latest
@@ -356,7 +360,7 @@ services:
       - video-loop
     volumes:
       - ./out:/out
-      - ${VIDEO_FILE_PATH:-./demo/sample.mp4}:/video/input.mp4:ro
+      - ./videos:/videos:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
@@ -369,7 +373,7 @@ services:
       - "--ingest"
       - "${VIDEO_LOOP_INGEST:-srt://srt-test-listener:9001?streamid=videoloop}"
       - "--video-file"
-      - "/video/input.mp4"
+      - "/videos/${VIDEO_FILENAME:-input.mp4}"
       - "--video-loop"
       - "--width"
       - "1920"

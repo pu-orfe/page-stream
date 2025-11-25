@@ -11,6 +11,7 @@ Page Stream loads a supplied URL or local HTML in Playwright-controlled Chromium
 - Compositor for multi-source, collage-style layouts.  See [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md).
 - Scales for production operations.  See [`OPERATIONAL-NOTES.md`](OPERATIONAL-NOTES.md) for restart guidance and troubleshooting.
 - Primary support for SRT, secondary support for RTMP, extensible to other outputs (its just `ffmpeg`!).
+- **Direct video file streaming** for looping pre-recorded content without browser overhead.
 - noVNC viewer to interact with the Chromium session (disabled by default).
 - Optimized for and tested on Apple Silicon.
 
@@ -145,6 +146,8 @@ Optional:
   --auto-refresh-seconds <n>  Auto page reload interval in seconds (0=disable)
   --inject-css <file>         Inject CSS from file into the page
   --inject-js <file>          Inject JavaScript from file into the page
+  --video-file <path>         Stream video file directly (bypasses browser/Xvfb)
+  --video-loop                Loop video file continuously (requires --video-file)
 ```
 
 ## Page Customization
@@ -256,6 +259,72 @@ Add scaling or overlays via extra args (before output):
 ```
 --extra-ffmpeg -vf scale=1920:1080
 ```
+
+## Direct Video File Streaming
+
+For looping pre-recorded video content without browser overhead, use the `--video-file` option. This bypasses the browser and Xvfb entirely, streaming directly from a video file via FFmpeg.
+
+### Video Files Directory
+
+Place your video files in the `./videos/` directory. This directory is:
+- Tracked in git via `.gitkeep` (the directory structure is preserved)
+- Contents are ignored via `.gitignore` (video files won't be committed)
+- Mounted read-only into containers for security
+
+```bash
+# Copy your video file to the videos directory
+cp /path/to/your/video.mp4 ./videos/input.mp4
+```
+
+### Basic Usage
+
+```bash
+# Stream a video file once
+docker run --rm \
+  -v $(pwd)/videos:/videos:ro \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=test \
+  --video-file /videos/input.mp4
+
+# Stream a video file in a continuous loop
+docker run --rm \
+  -v $(pwd)/videos:/videos:ro \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=test \
+  --video-file /videos/input.mp4 \
+  --video-loop
+```
+
+### Using Docker Compose
+
+The `docker-compose.stable.yml` includes a `video-loop` service profile:
+
+```bash
+# 1. Place your video in the videos directory
+cp /path/to/your/video.mp4 ./videos/input.mp4
+
+# 2. Start the video loop service
+docker compose -f docker-compose.stable.yml --profile video-loop up video-loop
+
+# Or specify a custom filename
+VIDEO_FILENAME=my-video.mp4 docker compose -f docker-compose.stable.yml --profile video-loop up video-loop
+```
+
+### Video Processing
+
+When streaming a video file, the following processing is applied:
+- **Scaling**: Video is scaled to target resolution (default 1920×1080) while preserving aspect ratio
+- **Padding**: Letterboxing/pillarboxing is added if aspect ratios differ
+- **Frame rate**: Normalized to target FPS (default 30)
+- **Encoding**: Re-encoded with libx264 (zerolatency tune) for streaming
+- **Audio**: Original audio is preserved if present; silent audio added if not
+
+### macOS Permissions
+
+If you encounter permission issues reading video files on macOS:
+1. Ensure the `./videos/` directory has appropriate permissions: `chmod 755 ./videos`
+2. Video files should be readable: `chmod 644 ./videos/*.mp4`
+3. If using Colima/Docker Desktop, the directory must be within a shared/mounted path
 
 ## Optional noVNC Viewer
 
