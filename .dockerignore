@@ -1,4 +1,4 @@
-# Build artifacts
+# Build artifacts (dist is generated inside container)
 dist
 node_modules
 
@@ -23,13 +23,6 @@ videos/
 .idea
 *.swp
 
-# Documentation (not needed in image)
-*.md
-!demo/*.md
-
 # Docker files (not needed in image)
 docker-compose*.yml
 Dockerfile
-
-# Test files (not needed in production image)
-tests/
