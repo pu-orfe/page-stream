@@ -18,8 +18,8 @@ jobs:
       # Ensure tests run in lightweight test mode and do not start heavy browsers/ffmpeg
       PAGE_STREAM_TEST_MODE: '1'
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
+    - uses: actions/checkout@v6
+    - uses: actions/setup-node@v6
       with:
         node-version: '18'
         cache: 'npm'
@@ -50,7 +50,7 @@ jobs:
       
     - name: Upload test log
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: test-output
         path: test-output.log
