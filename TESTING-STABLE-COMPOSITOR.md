@@ -19,6 +19,8 @@ This guide walks through testing the stable compositor harness with network isol
    cp .env.stable.example .env
    ```
 
+4. **For production testing with Kaltura endpoints**: If your ingest URLs contain `#` characters, set up `.env.secrets.sh` and source it before all `docker-compose` commands. See [`SECRETS.md`](SECRETS.md) for setup. For local testing, this step is not required.
+
 ## Testing Phases
 
 ### Phase 1: Verify Standard Instances (Isolated from Compositor)

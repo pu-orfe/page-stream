@@ -10,13 +10,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     entrypoint: ["sh", "-c"]
-    command: >
-      if [ "$${SKIP_REQUIREMENTS_CHECK:-false}" = "true" ]; then
-        echo "System requirements check skipped (SKIP_REQUIREMENTS_CHECK=true)";
-        exit 0;
-      else
-        /scripts/check-system-requirements.sh;
-      fi
+    command:
+      - |
+        if [ "$${SKIP_REQUIREMENTS_CHECK:-false}" = "true" ]; then
+          echo "System requirements check skipped (SKIP_REQUIREMENTS_CHECK=true)";
+          exit 0;
+        else
+          /scripts/check-system-requirements.sh;
+        fi
     healthcheck:
       test: ["CMD", "true"]
       interval: 30s
@@ -193,41 +194,74 @@ services:
   # ============================================================================
   # Standard Streaming Instances (1920×1080, isolated from compositor)
   # ============================================================================
+  # TEMPORARY: standard-1 switched to direct video file loop (fireplace)
+  # To restore browser-based streaming, see commented block below
   standard-1:
     image: page-stream:latest
     container_name: standard-1
     volumes:
-      - ./demo:/app/demo:ro
-      - ./demo:/out/demo:ro
+      - ./videos:/videos:ro
     environment:
       - WIDTH=1920
       - HEIGHT=1080
-      - DISPLAY=${STANDARD_1_DISPLAY:-:104}
-      - INJECT_CSS=${STANDARD_1_INJECT_CSS:-}
-      - INJECT_JS=${STANDARD_1_INJECT_JS:-}
-    # No networks declaration = joins default network only
-    depends_on:
-      requirements-check:
-        condition: service_completed_successfully
-      srt-test-listener:
-        condition: service_healthy
-    # Use STANDARD_1_URL from .env.stable (falls back to demo page if unset)
+    # No depends_on - video file mode doesn't need other services
     command:
       - "--ingest"
       - "${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1}"
-      - "--url"
-      - "${STANDARD_1_URL:-file:///app/demo/test-standard.html}"
-      - "--auto-refresh-seconds"
-      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
-      - "--crop-infobar"
-      - "64"
+      - "--video-file"
+      - "/videos/fireplace.mp4"
+      - "--video-loop"
+      - "--width"
+      - "1920"
+      - "--height"
+      - "1080"
+      - "--fps"
+      - "30"
+      - "--video-bitrate"
+      - "5000k"
     healthcheck:
-      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      test: ["CMD-SHELL", "pgrep ffmpeg"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 10s
     restart: unless-stopped
+  # --------------------------------------------------------------------------
+  # ORIGINAL standard-1 (browser-based) - uncomment to restore:
+  # --------------------------------------------------------------------------
+  # standard-1:
+  #   image: page-stream:latest
+  #   container_name: standard-1
+  #   volumes:
+  #     - ./demo:/app/demo:ro
+  #     - ./demo:/out/demo:ro
+  #   environment:
+  #     - WIDTH=1920
+  #     - HEIGHT=1080
+  #     - DISPLAY=${STANDARD_1_DISPLAY:-:104}
+  #     - INJECT_CSS=${STANDARD_1_INJECT_CSS:-}
+  #     - INJECT_JS=${STANDARD_1_INJECT_JS:-}
+  #   depends_on:
+  #     requirements-check:
+  #       condition: service_completed_successfully
+  #     srt-test-listener:
+  #       condition: service_healthy
+  #   command:
+  #     - "--ingest"
+  #     - "${STANDARD_1_INGEST:-srt://srt-test-listener:9001?streamid=std1}"
+  #     - "--url"
+  #     - "${STANDARD_1_URL:-file:///app/demo/test-standard.html}"
+  #     - "--auto-refresh-seconds"
+  #     - "${DEFAULT_REFRESH_INTERVAL:-3600}"
+  #     - "--crop-infobar"
+  #     - "64"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 15s
+  #   restart: unless-stopped
 
   standard-2:
     image: page-stream:latest

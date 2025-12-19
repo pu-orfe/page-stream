@@ -38,23 +38,49 @@ For the demo:
 
 ## Quick Demo
 
-Copy the example `.env.stable.example` to `.env`.  Edit `.env`, setting your own URLs for:
+### 1. Configure URLs
+
+Copy the example `.env.stable.example` to `.env`:
+
+```bash
+cp .env.stable.example .env
+```
+
+Edit `.env`, setting your own URLs for:
 
 - `STANDARD_1_URL`, etc — the target HTTP(S) pages streamed by the `standard-*`, full screen (HD) services.
 - `SOURCE_LEFT_URL`, `SOURCE_RIGHT_URL` — the two half-width (HD) source pages used by the example compositor.
 
-**For production with secret stream IDs (Kaltura, etc)**: If your stream IDs contain `#` characters, see [`SECRETS.md`](SECRETS.md) for proper configuration using `.env.secrets.sh`.
+### 2. Configure Secret Stream IDs (Production)
 
-Make sure no existing stack is up, build the image, then bring up the stack!
+**IMPORTANT**: If your ingest URLs contain `#` characters (common with Kaltura stream IDs), you **must** use `.env.secrets.sh`:
 
-Example streams that you can open with VLC, `ffplay`, etc will appear in the `out` folder.
+```bash
+# Copy the example file
+cp env.secrets.sh.example .env.secrets.sh
+
+# Edit .env.secrets.sh with your actual stream IDs
+# Replace the example values with your Kaltura credentials
+```
+
+See [`SECRETS.md`](SECRETS.md) for detailed configuration instructions.
+
+### 3. Start the Stack
+
+Make sure no existing stack is up, build the image, then bring up the stack:
 
 ```bash
 docker build -t page-stream:latest .
 docker-compose -f docker-compose.stable.yml down
-# For production with secret stream IDs: source .env.secrets.sh first
-docker-compose -f docker-compose.stable.yml up -d --build
+
+# With production secret stream IDs (Kaltura, etc):
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+
+# Or for local testing without external ingest:
+docker-compose -f docker-compose.stable.yml up -d
 ```
+
+Example streams that you can open with VLC, `ffplay`, etc will appear in the `out` folder.
 
 ## Resource Constraints
 
