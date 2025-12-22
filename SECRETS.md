@@ -10,24 +10,25 @@ Use a shell script (`.env.secrets.sh`) to export environment variables directly,
 
 ### Setup
 
-1. Create `.env.secrets.sh` (already gitignored):
+1. Copy the example file and edit with your credentials:
 
 ```bash
-#!/bin/bash
-# Source this file before running docker-compose to load secret stream IDs
-# Usage: source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+# Copy the example file
+cp env.secrets.sh.example .env.secrets.sh
 
-export STANDARD_1_INGEST='srt://host:port?streamid=#:::e=1_stream1,st=0,p=pass1'
-export STANDARD_2_INGEST='srt://host:port?streamid=#:::e=1_stream2,st=0,p=pass2'
-export STANDARD_3_INGEST='srt://host:port?streamid=#:::e=1_stream3,st=0,p=pass3'
-export STANDARD_4_INGEST='srt://host:port?streamid=#:::e=1_stream4,st=0,p=pass4'
-export COMPOSITOR_INGEST='srt://host:port?streamid=#:::e=1_composite,st=0,p=pass5'
+# Edit .env.secrets.sh and replace example values with your actual stream IDs
+# Example format:
+# export STANDARD_1_INGEST='srt://host:port?streamid=#:::e=1_stream1,st=0,p=pass1'
+# export STANDARD_2_INGEST='srt://host:port?streamid=#:::e=1_stream2,st=0,p=pass2'
+# etc.
 ```
 
 2. Make it executable:
 ```bash
 chmod +x .env.secrets.sh
 ```
+
+**Note**: The `.env.secrets.sh` file is already gitignored, so your credentials will not be committed to version control.
 
 ### Usage
 

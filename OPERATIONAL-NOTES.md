@@ -23,6 +23,11 @@
 **Correct restart procedure**:
 ```bash
 docker-compose -f docker-compose.stable.yml down
+
+# With production secret stream IDs (Kaltura, etc):
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+
+# Or for local testing:
 docker-compose -f docker-compose.stable.yml up -d
 ```
 
@@ -31,6 +36,8 @@ docker-compose -f docker-compose.stable.yml up -d
 - Clears all SRT connection state
 - Resets timestamp synchronization across all sources
 - Compositor receives fresh, synchronized inputs
+
+**Note**: If your ingest URLs contain `#` characters (e.g., Kaltura stream IDs), you must source `.env.secrets.sh` before docker-compose. See [`SECRETS.md`](SECRETS.md).
 
 ## Timestamp Synchronization in Multi-Source Composition
 
@@ -130,6 +137,11 @@ Before any restart operation:
    ```bash
    docker-compose -f docker-compose.stable.yml down
    sleep 3  # Allow full cleanup
+
+   # With production secrets:
+   source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+
+   # Or for local testing:
    docker-compose -f docker-compose.stable.yml up -d
    ```
 
@@ -178,6 +190,11 @@ docker system prune -f
 
 # Rebuild and restart
 docker-compose -f docker-compose.stable.yml build --no-cache
+
+# With production secrets:
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+
+# Or for local testing:
 docker-compose -f docker-compose.stable.yml up -d
 ```
 

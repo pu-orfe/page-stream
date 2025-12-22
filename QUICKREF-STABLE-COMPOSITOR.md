@@ -6,7 +6,10 @@
 # Build image
 docker build -t page-stream:latest .
 
-# Start everything
+# Start everything (with secrets for production Kaltura endpoints)
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
+
+# Or for local testing without external ingest:
 docker-compose -f docker-compose.stable.yml up -d
 
 # Watch compositor logs
@@ -15,6 +18,8 @@ docker-compose -f docker-compose.stable.yml logs -f compositor
 # View output
 ffplay -fflags nobuffer -flags low_delay ./out/composite.ts
 ```
+
+**Note**: If your ingest URLs contain `#` characters (e.g., Kaltura stream IDs), you **must** source `.env.secrets.sh` before running docker-compose. See [`SECRETS.md`](SECRETS.md) for setup.
 
 ## Verify Network Isolation
 
@@ -43,8 +48,12 @@ docker-compose -f docker-compose.stable.yml start compositor source-left source-
 ## Common Operations
 
 ```bash
-# Restart a single source
-docker-compose -f docker-compose.stable.yml restart source-left
+# Restart a single source (avoid this, use full recreation instead - see OPERATIONAL-NOTES.md)
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml restart source-left
+
+# Full system restart (RECOMMENDED - avoids timestamp sync issues)
+docker-compose -f docker-compose.stable.yml down
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d
 
 # Stop compositor stack only
 docker-compose -f docker-compose.stable.yml stop compositor source-left source-right srt-ingest
