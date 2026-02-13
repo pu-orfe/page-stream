@@ -7,6 +7,8 @@ docker-compose.yml
 .env
 out/
 .env.secrets.sh
+CLAUDE.md
+AGENTS.md
 
 # Video files directory (keep .gitkeep, ignore video files)
 videos/*
