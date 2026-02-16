@@ -93,6 +93,7 @@ export class PageStreamer {
       '--disable-gpu',
       '--disable-software-rasterizer',
       '--disable-gpu-compositing',
+      '--dbus-stub',
       ...(this.opts.fullscreen ? [
         '--kiosk',
         '--start-fullscreen',
@@ -127,6 +128,10 @@ export class PageStreamer {
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
         pageFound = await this.persistentContext.newPage();
+        // Add Cloudflare bypass header BEFORE navigation
+        await pageFound.setExtraHTTPHeaders({
+          'x-wdsoit-bot-bypass': 'true'
+        });
         console.log(`[page-load] Loading page: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
         try {
           await pageFound.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
@@ -134,6 +139,24 @@ export class PageStreamer {
         } catch (err: any) {
           if (err.name === 'TimeoutError') {
             console.warn(`[page-load] WARNING: Page load timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
+            console.warn(`[page-load] URL: ${startUrl}`);
+            console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        // Page already exists (app mode auto-navigated). Set headers and reload to apply them.
+        await pageFound.setExtraHTTPHeaders({
+          'x-wdsoit-bot-bypass': 'true'
+        });
+        console.log(`[page-load] Reloading page with bypass header: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
+        try {
+          await pageFound.reload({ timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+          console.log('[page-load] Page reloaded successfully');
+        } catch (err: any) {
+          if (err.name === 'TimeoutError') {
+            console.warn(`[page-load] WARNING: Page reload timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
             console.warn(`[page-load] URL: ${startUrl}`);
             console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
           } else {
@@ -154,6 +177,10 @@ export class PageStreamer {
       // Inject visibility override early via init script
       await ctx.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       this.page = await ctx.newPage();
+      // Add Cloudflare bypass header
+      await this.page.setExtraHTTPHeaders({
+        'x-wdsoit-bot-bypass': 'true'
+      });
       console.log(`[page-load] Loading page: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
       try {
         await this.page.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
