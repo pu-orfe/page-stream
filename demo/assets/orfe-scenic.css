@@ -1,0 +1,142 @@
+.princeton-branding, .main-menu, #block-searchform, #breadcrumb, footer, .block-ps-people-list .field--name-title:after, .toggle-search-icon, #block-siempre-sitebranding, #block-siempre-pagetitle, #block-useraccountmenu, .description, .ps-image-gallery-description, .site-name, .controls, #block-ps-tiger-page-title, .block-page-title-block {
+  display: none !important;
+}
+
+.ps-image-gallery {
+	height: 1144px;
+	width: 1920px;
+	z-index: 999;
+	position: fixed;
+	top:0;
+	left:0;
+}
+
+.media--type-ps-image-gallery.media--view-mode-ps-content-width-freeform img {
+	min-height: 1080px !important;
+}
+
+.number-indicator {
+  position: fixed;
+  bottom: 120px;
+  left: 60px;
+  z-index: 1000;
+}
+
+header {
+	margin: 0;
+	padding: 0;
+}
+
+.site-logo img {
+  filter: brightness(0) invert(1);
+  position: fixed;
+  bottom: 120px;
+  right: 60px;
+  z-index: 1000;
+}
+
+.container {
+  max-width: 100%;
+}
+
+body.layout-block-padding-small .content-list-grid .content-list-items {
+  grid-column-gap: 1rem;
+}
+
+.content-list-grid .content-list-items {
+  grid-row-gap: 0rem;
+}
+
+.content-list-items {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    align-items: start;
+}
+
+/* .fontset2 .content-list-item .field--name-title {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.1rem;
+  margin-bottom: 0;
+} */
+
+.content-list .content-list-item {
+  margin-bottom: 0;
+}
+
+.content-list-item {
+	    /* Keep existing layout and constraint */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    max-height: 14vh;
+    width: auto;
+
+    /* ADD vertical padding to create internal buffer space
+       and guarantee minimum height for the text line(s). */
+    padding-top: 0.5vh;
+    padding-bottom: 1vh;
+
+    /* Ensure no residual external margin interferes */
+    margin-bottom: 0 !important;
+}
+
+.content-list-item .field__item {
+    /* Ensure this container can grow/shrink if needed, but primarily respect max-height */
+    width: 100%; /* Take full available width of the card */
+    text-align: center; /* Center the image horizontally within this container */
+    
+    /* This element contains the <a> tag which contains the <img> */
+}
+
+.content-list-item img {
+    max-height: 12vh;
+    width: auto; 
+     
+    /* Optional: Ensure the image itself scales nicely if its aspect ratio is off */
+    object-fit: contain; 
+}
+
+/* 4. Style the Label */
+.fontset2 .content-list-item .field--name-title {
+    /* --- NEW FONT STACK FOR HD LEGIBILITY --- */
+    font-family:
+        'system-ui',
+        'Roboto',
+        'Arial',
+        'Helvetica',
+        sans-serif;
+
+    /* Existing properties... */
+    text-align: center;
+    font-weight: 800;
+    margin-bottom: 0;
+
+    /* Keep scaled text size */
+    font-size: 1.1vmin;
+    line-height: 1.2vmin;
+}
+
+.block-ps-people-list .feature-is-3x4 .field--name-field-ps-featured-image {
+  max-width: initial;
+}
+
+.content-list-grid .content-list-items .field--name-field-ps-featured-image, 
+.block-ps-people-list .field--name-title {
+  margin-bottom: 0;
+}
+
+/* --- A. Increase Row Gaps on the Grid Container --- */
+.content-list-grid .content-list-items {
+    /* Increase the vertical space between grid rows. */
+    /* Use 'vh' to scale the gap size to the 1080px screen height. */
+    grid-row-gap: 1vh; /* Changed from 0rem to 1% of viewport height (approx 10.8px) */
+
+    /* Keep the horizontal gap as you had it */
+    grid-column-gap: 1rem;
+}
+
+.container {
+  margin-top: 15px;
+}

@@ -31,7 +31,8 @@ RUN npm run build
 
 ENV DISPLAY=:99 \
     NODE_ENV=production \
-    PUPPETEER_SKIP_DOWNLOAD=true
+    PUPPETEER_SKIP_DOWNLOAD=true \
+    DBUS_SESSION_BUS_ADDRESS=/dev/null
 
 # Expose optional noVNC/websockify port (disabled by default). User must -p to map.
 EXPOSE 6080

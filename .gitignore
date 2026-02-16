@@ -9,6 +9,7 @@ out/
 .env.secrets.sh
 CLAUDE.md
 AGENTS.md
+.claude
 
 # Video files directory (keep .gitkeep, ignore video files)
 videos/*
