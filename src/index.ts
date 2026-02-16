@@ -128,7 +128,7 @@ export class PageStreamer {
       let pageFound = this.persistentContext.pages()[0];
       if (!pageFound) {
         pageFound = await this.persistentContext.newPage();
-        // Add Cloudflare bypass header BEFORE navigation
+        // Add custom headers before navigation
         await pageFound.setExtraHTTPHeaders({
           'x-wdsoit-bot-bypass': 'true'
         });
@@ -146,7 +146,7 @@ export class PageStreamer {
           }
         }
       } else {
-        // Page already exists (app mode auto-navigated). Set headers and reload to apply them.
+        // Page already exists (app mode auto-navigated). Set custom headers and reload.
         await pageFound.setExtraHTTPHeaders({
           'x-wdsoit-bot-bypass': 'true'
         });
@@ -177,7 +177,7 @@ export class PageStreamer {
       // Inject visibility override early via init script
       await ctx.addInitScript({ content: VISIBILITY_OVERRIDE_SCRIPT });
       this.page = await ctx.newPage();
-      // Add Cloudflare bypass header
+      // Add custom headers
       await this.page.setExtraHTTPHeaders({
         'x-wdsoit-bot-bypass': 'true'
       });
