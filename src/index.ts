@@ -90,6 +90,9 @@ export class PageStreamer {
       '--disable-dev-shm-usage',
       '--no-sandbox',
       `--window-size=${this.opts.width},${this.opts.height}`,
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--disable-gpu-compositing',
       ...(this.opts.fullscreen ? [
         '--kiosk',
         '--start-fullscreen',
