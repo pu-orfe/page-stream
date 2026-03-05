@@ -11,15 +11,15 @@
     "test": "node --test --loader ts-node/esm tests/*.test.ts"
   },
   "dependencies": {
-    "commander": "^11.1.0",
-  "playwright": "1.55.1"
+    "commander": "^14.0.3",
+  "playwright": "1.58.2"
   },
   "devDependencies": {
-    "@types/node": "^20.14.9",
+    "@types/node": "^24.10.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.4"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   },
-  "engines": {"node": ">=18"},
+  "engines": {"node": ">=20"},
   "license": "MIT"
 }
