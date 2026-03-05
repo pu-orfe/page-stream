@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM mcr.microsoft.com/playwright:v1.55.1-jammy AS base
+FROM mcr.microsoft.com/playwright:v1.58.2-jammy AS base
 # NOTE: If this base image cannot be pulled due to network restrictions, a manual
 # fallback build (Ubuntu + Node 18 + playwright install) can be created separately.
 # Keeping Dockerfile minimal for reliability; see README (TODO add offline notes).
