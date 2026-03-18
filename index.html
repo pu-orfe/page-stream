@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Stream - Headless Web Page Video Streamer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="container">
+      <h1>Page Stream</h1>
+      <p class="tagline">Headless, disposable web page video streamer for public displays</p>
+      <p class="subtitle">Load any URL or local HTML in a containerized headless browser, capture it with FFmpeg, and push encoded video to SRT or RTMP ingest endpoints &mdash; no broadcast software required.</p>
+      <div class="hero-actions">
+        <a href="https://github.com/pu-orfe/page-stream" class="btn btn-primary">View on GitHub</a>
+        <a href="#quickstart" class="btn btn-secondary">Get Started</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- How It Works -->
+  <section id="how-it-works" class="section">
+    <div class="container">
+      <h2>How It Works</h2>
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="step-number">1</div>
+          <h3>Virtual Display</h3>
+          <p>Container launches Xvfb at your requested resolution.</p>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <div class="step-number">2</div>
+          <h3>Browser</h3>
+          <p>Playwright-controlled Chromium loads the target page.</p>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <div class="step-number">3</div>
+          <h3>Capture</h3>
+          <p>FFmpeg performs x11grab of the display and encodes with libx264.</p>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <div class="step-number">4</div>
+          <h3>Stream</h3>
+          <p>Output is pushed via SRT, RTMP, or saved to a local file.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="section section-alt">
+    <div class="container">
+      <h2>Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#9655;</div>
+          <h3>Single-Command Streaming</h3>
+          <p>Containerized streaming of any web page or local HTML file with one command. No GUI, no desktop, no broadcast software.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9998;</div>
+          <h3>CSS &amp; JS Injection</h3>
+          <p>Inject custom CSS overrides and JavaScript into the streamed page for styling transformations and interactive behavior.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9638;</div>
+          <h3>Multi-Source Compositor</h3>
+          <p>Compose multiple page sources into collage-style layouts using FFmpeg filter graphs. Side-by-side, tiled, or custom arrangements.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128225;</div>
+          <h3>SRT &amp; RTMP</h3>
+          <p>Primary support for SRT (Secure Reliable Transport), secondary RTMP/RTMPS, extensible to any FFmpeg output.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#127916;</div>
+          <h3>Direct Video File Streaming</h3>
+          <p>Loop pre-recorded video files directly to ingest endpoints without browser overhead. Auto-scales, pads, and normalizes frame rates.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128268;</div>
+          <h3>Reconnect &amp; Recovery</h3>
+          <p>Exponential backoff reconnection for SRT/RTMP failures. Structured JSON health logging for monitoring.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128065;</div>
+          <h3>noVNC Debugging</h3>
+          <p>Optional browser-based VNC viewer to interact with the headless Chromium session in real time. Disabled by default.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9881;</div>
+          <h3>Production Ready</h3>
+          <p>Automatic system requirements validation, per-container configuration, secret management, and operational runbooks.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start -->
+  <section id="quickstart" class="section">
+    <div class="container">
+      <h2>Quick Start</h2>
+      <div class="steps">
+        <div class="step">
+          <h3>1. Configure URLs</h3>
+          <pre><code>cp .env.stable.example .env
+# Edit .env with your target URLs:
+#   STANDARD_1_URL, STANDARD_2_URL, ...
+#   SOURCE_LEFT_URL, SOURCE_RIGHT_URL</code></pre>
+        </div>
+        <div class="step">
+          <h3>2. Configure Secrets (Production)</h3>
+          <p>If your ingest URLs contain <code>#</code> characters (e.g. Kaltura stream IDs):</p>
+          <pre><code>cp env.secrets.sh.example .env.secrets.sh
+# Edit .env.secrets.sh with your actual stream IDs</code></pre>
+        </div>
+        <div class="step">
+          <h3>3. Build &amp; Start</h3>
+          <pre><code>docker build -t page-stream:latest .
+
+# With production secrets:
+source .env.secrets.sh && \
+  docker-compose -f docker-compose.stable.yml up -d
+
+# Or for local testing:
+docker-compose -f docker-compose.stable.yml up -d</code></pre>
+          <p>Streams appear in the <code>out/</code> folder &mdash; open with VLC or <code>ffplay</code>.</p>
+        </div>
+      </div>
+      <div class="requirements-box">
+        <h3>Minimum Requirements</h3>
+        <ul>
+          <li>Docker</li>
+          <li>6 CPU cores</li>
+          <li>16 GB RAM</li>
+        </ul>
+        <p>An automatic check validates resources at startup. For macOS with Colima:</p>
+        <pre><code>colima stop
+colima start --cpu 8 --memory 16</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Examples -->
+  <section id="examples" class="section section-alt">
+    <div class="container">
+      <h2>Examples</h2>
+
+      <div class="example">
+        <h3>Stream a Web Page via SRT</h3>
+        <pre><code>docker run --rm \
+  -e WIDTH=1920 -e HEIGHT=1080 \
+  page-stream:latest \
+  --ingest srt://example.com:9000?streamid=live.slp \
+  --url https://your-dashboard.example.com</code></pre>
+      </div>
+
+      <div class="example">
+        <h3>RTMP Output</h3>
+        <pre><code>docker run --rm \
+  -e WIDTH=1280 -e HEIGHT=720 \
+  page-stream:latest \
+  --ingest rtmp://live.example.com/app/streamKey \
+  --format flv \
+  --url https://your-page.example.com</code></pre>
+      </div>
+
+      <div class="example">
+        <h3>CSS &amp; JS Injection</h3>
+        <pre><code>docker run --rm \
+  -v $(pwd)/custom.css:/custom.css \
+  -v $(pwd)/custom.js:/custom.js \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=demo \
+  --url https://your-page.example.com \
+  --inject-css /custom.css \
+  --inject-js /custom.js</code></pre>
+      </div>
+
+      <div class="example">
+        <h3>Loop a Video File</h3>
+        <pre><code># Place video in ./videos/ directory
+cp /path/to/video.mp4 ./videos/input.mp4
+
+docker run --rm \
+  -v $(pwd)/videos:/videos:ro \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=test \
+  --video-file /videos/input.mp4 \
+  --video-loop</code></pre>
+      </div>
+
+      <div class="example">
+        <h3>Auto-Refresh Every 5 Minutes</h3>
+        <pre><code>docker run --rm \
+  -e WIDTH=1280 -e HEIGHT=720 \
+  page-stream:latest \
+  --ingest srt://host:9000?streamid=live \
+  --url https://live-data.example.com \
+  --auto-refresh-seconds 300</code></pre>
+      </div>
+
+      <div class="example">
+        <h3>Local File Output (Testing)</h3>
+        <pre><code>docker run --rm \
+  -v $(pwd)/out:/out \
+  page-stream:latest \
+  --ingest /out/test.ts \
+  --format mpegts \
+  --url demo/index.html</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI Reference -->
+  <section id="cli" class="section">
+    <div class="container">
+      <h2>CLI Reference</h2>
+      <pre class="cli-block"><code>page-stream --ingest &lt;URI&gt; [options]
+
+<span class="cli-heading">Required:</span>
+  -i, --ingest &lt;uri&gt;                Ingest URI (SRT/RTMP/file)
+
+<span class="cli-heading">Page Options:</span>
+  -u, --url &lt;url&gt;                   Page URL or local file (default: demo)
+      --width &lt;n&gt;                   Viewport width (default: 1280)
+      --height &lt;n&gt;                  Viewport height (default: 720)
+      --fps &lt;n&gt;                     Frames per second (default: 30)
+
+<span class="cli-heading">Encoding:</span>
+      --preset &lt;p&gt;                  x264 preset (default: veryfast)
+      --video-bitrate &lt;kbps&gt;        Video bitrate (default: 2500k)
+      --audio-bitrate &lt;kbps&gt;        Audio bitrate (default: 128k)
+      --format &lt;fmt&gt;                Container format (default: mpegts)
+      --extra-ffmpeg &lt;args...&gt;      Additional raw FFmpeg arguments
+
+<span class="cli-heading">Browser:</span>
+      --no-headless                  Show browser window
+      --no-fullscreen                Disable fullscreen/kiosk mode
+      --no-app-mode                  Show full browser chrome
+      --crop-infobar &lt;px&gt;           Crop N pixels from top (remove banner)
+
+<span class="cli-heading">Refresh &amp; Control:</span>
+      --refresh-signal &lt;sig&gt;         Reload signal (default: SIGHUP)
+      --graceful-stop-signal &lt;sig&gt;   Stop signal (default: SIGTERM)
+      --auto-refresh-seconds &lt;n&gt;    Auto reload interval (0 = disable)
+
+<span class="cli-heading">Reconnection:</span>
+      --reconnect-attempts &lt;n&gt;       Max retries, 0 = infinite (default: 0)
+      --reconnect-initial-delay-ms   Initial backoff delay (default: 1000)
+      --reconnect-max-delay-ms       Max backoff delay (default: 15000)
+
+<span class="cli-heading">Monitoring:</span>
+      --health-interval-seconds &lt;n&gt;  Health log interval (default: 30)
+
+<span class="cli-heading">Injection:</span>
+      --inject-css &lt;file&gt;            Inject CSS from file
+      --inject-js &lt;file&gt;             Inject JavaScript from file
+
+<span class="cli-heading">Video File (bypass browser):</span>
+      --video-file &lt;path&gt;            Stream video file directly
+      --video-loop                   Loop video continuously</code></pre>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section id="architecture" class="section section-alt">
+    <div class="container">
+      <h2>Architecture</h2>
+      <div class="arch-cols">
+        <div class="arch-block">
+          <h3>Standard Instances</h3>
+          <p>Each standard instance runs independently on the default network, streaming a single full-HD page to its own ingest endpoint.</p>
+          <pre class="arch-diagram">standard-1 (1920&times;1080) &rarr; SRT ingest
+standard-2 (1920&times;1080) &rarr; SRT ingest
+standard-3 (1920&times;1080) &rarr; SRT ingest
+standard-4 (1920&times;1080) &rarr; SRT ingest</pre>
+        </div>
+        <div class="arch-block">
+          <h3>Compositor Pipeline</h3>
+          <p>Two half-width sources are composed into a single full-HD stream via an FFmpeg filter graph on an isolated network.</p>
+          <pre class="arch-diagram">source-left  (960&times;1080) &rarr;&#9135;
+                            &rarr; compositor &rarr; SRT ingest
+source-right (960&times;1080) &rarr;&#9135;</pre>
+        </div>
+      </div>
+      <div class="arch-block" style="margin-top: 2rem;">
+        <h3>Container Stack</h3>
+        <pre class="arch-diagram">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  requirements-check                                          &#9474;
+&#9474;  Validates CPU/RAM before other services start               &#9474;
+&#9500;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9508;
+&#9474;  default network             &#9474;  compositor_net              &#9474;
+&#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9474;
+&#9474;  &#9474; standard-1  standard-2 &#9474;  &#9474;  &#9474;  source-left              &#9474;  &#9474;
+&#9474;  &#9474; standard-3  standard-4 &#9474;  &#9474;  &#9474;  source-right             &#9474;  &#9474;
+&#9474;  &#9474; srt-test-listener      &#9474;  &#9474;  &#9474;  compositor               &#9474;  &#9474;
+&#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;  &#9474;  srt-ingest               &#9474;  &#9474;
+&#9474;                            &#9474;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Health & Monitoring -->
+  <section id="monitoring" class="section">
+    <div class="container">
+      <h2>Health &amp; Monitoring</h2>
+      <p>Structured JSON health lines are emitted at configurable intervals:</p>
+      <pre><code>{
+  "type": "health",
+  "ts": "2024-01-01T00:00:00.000Z",
+  "uptimeSec": 30.1,
+  "ingest": "srt://example.com:9000?streamid=test",
+  "protocol": "SRT",
+  "restartAttempt": 0,
+  "lastFfmpegExitCode": null,
+  "retrying": false
+}</code></pre>
+      <div class="exit-codes">
+        <h3>Exit Codes</h3>
+        <table>
+          <thead>
+            <tr><th>Code</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>0</code></td><td>Graceful stop</td></tr>
+            <tr><td><code>1</code></td><td>Unhandled internal error</td></tr>
+            <tr><td><code>10</code></td><td>SRT/RTMP reconnect attempts exhausted</td></tr>
+            <tr><td><code>11</code></td><td>Non-retry protocol failure</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>Page Stream &mdash; Princeton University, Operations Research &amp; Financial Engineering</p>
+      <p><a href="https://github.com/pu-orfe/page-stream">GitHub</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
