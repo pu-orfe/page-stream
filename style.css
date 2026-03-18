@@ -122,6 +122,24 @@ code { font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monosp
 .feature-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
 .feature-card h3 { font-size: 1.05rem; color: #0f172a; margin-bottom: 0.4rem; }
 .feature-card p { font-size: 0.9rem; color: #475569; }
+.feature-coming-soon {
+  border-style: dashed;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  position: relative;
+}
+.badge-coming-soon {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #3b82f6;
+  background: #dbeafe;
+  border-radius: 4px;
+}
 
 /* Steps */
 .steps { display: flex; flex-direction: column; gap: 2rem; }
