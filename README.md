@@ -114,6 +114,30 @@ If increasing Colima memory isn't an option, consider reducing per-container res
 
 **Note:** To bypass the requirements check (not recommended), set `SKIP_REQUIREMENTS_CHECK=true` in your `.env` file.
 
+## Temporarily Swapping a Container's URL
+
+You can temporarily change the URL a specific container streams without editing any files. Pass the URL environment variable override when recreating the container:
+
+```bash
+# Temporarily swap standard-4 to a different page
+source .env.secrets.sh && \
+  STANDARD_4_URL='https://example.com/other-page' \
+  docker-compose -f docker-compose.stable.yml up -d standard-4
+
+# Temporarily swap source-left
+source .env.secrets.sh && \
+  SOURCE_LEFT_URL='https://example.com/flyer.html' \
+  docker-compose -f docker-compose.stable.yml up -d source-left
+```
+
+The override only lives in that shell invocation. To revert, recreate the container without the override:
+
+```bash
+source .env.secrets.sh && docker-compose -f docker-compose.stable.yml up -d standard-4
+```
+
+The container will pick up the default URL from `.env`, `.env.secrets.sh`, or the compose file fallback.
+
 ## Refreshing the Streamed Page
 
 Manual refresh methods:
