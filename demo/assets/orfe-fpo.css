@@ -71,19 +71,14 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 }
 
 .content-list-item {
-	    /* Keep existing layout and constraint */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    max-height: 14vh;
     width: auto;
-
-    /* ADD vertical padding to create internal buffer space
-       and guarantee minimum height for the text line(s). */
     padding-top: 0.5vh;
     padding-bottom: 1vh;
-
+    overflow: hidden;
 }
 
 .content-list-item .field__item {
