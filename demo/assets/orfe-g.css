@@ -115,3 +115,6 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 .container {
   margin-top: 15px;
 }
+
+/* Alert banner styling is handled by orfe-g-alert.js (inline styles)
+   to avoid position:fixed being trapped by ancestor transforms. */
