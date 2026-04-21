@@ -78,7 +78,6 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
     width: auto;
     padding-top: 0.5vh;
     padding-bottom: 1vh;
-    overflow: hidden;
 }
 
 .content-list-item .field__item {
