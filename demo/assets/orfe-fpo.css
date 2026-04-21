@@ -51,7 +51,7 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 }
 
 .content-list-items {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(4, 1fr) !important;
     align-items: start;
 }
 
@@ -109,7 +109,7 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 
     /* Keep scaled text size */
     font-size: 1.1vmin;
-    line-height: 1.2vmin;
+    line-height: 1.9vmin;
 }
 
 .block-ps-people-list .feature-is-3x4 .field--name-field-ps-featured-image {
