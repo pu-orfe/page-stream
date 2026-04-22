@@ -31,12 +31,18 @@ header {
 	padding: 0;
 }
 
-.site-logo img {
-  position: fixed;
-  bottom: 120px;
-  right: 60px;
-  z-index: 1000;
+/* Reduce whitespace above the Announcements title */
+.block-page-title-block,
+.block-page-title-block h1 {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
+
+.block-page-title-block {
+  margin-bottom: 1.5rem !important;
+}
+
+/* Logo positioning is handled by orfe-fpo.js (inline styles) */
 
 .container {
   max-width: 100%;
@@ -132,26 +138,13 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 }
 
 .container {
-  margin-top: 15px;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 
-/* Put QR code and fine print in bottom-left corner */
-
-body.section-events.page-node-10821 .background-color-light-gray.constrained-bkg-constrained-content.layout.layout--twocol-75-25 {
-  /* --- Pinning & Stacking --- */
-  position: fixed; 
-  bottom: 100px;
-  left: 0; 
-  z-index: 1000; 
-  
-  /* --- Size & Wrapping Constraints --- */
-  max-width: 80vw;
-  overflow-wrap: break-word; /* Ensures text wraps */
-  
-  /* Ensures padding/border are included in the max-width */
-  box-sizing: border-box; 
-}
+/* QR code / footer box positioning is handled by orfe-fpo.js (inline styles)
+   to avoid position:fixed being trapped by ancestor transforms. */
 
 /* Hide virtual location field reused for thesis link */
 
