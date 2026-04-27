@@ -11,10 +11,11 @@
       'bottom: 40px',
       'left: 20px',
       'z-index: 1000',
-      'max-width: 55vw',
+      'max-width: 80vw',
+      'width: 80vw',
       'overflow-wrap: break-word',
       'box-sizing: border-box',
-      'transform: scale(0.65)',
+      'transform: scale(0.5)',
       'transform-origin: bottom left'
     ].join(' !important; ') + ' !important;';
   }
@@ -26,7 +27,7 @@
       'bottom: 60px',
       'right: 60px',
       'z-index: 1000',
-      'max-height: 80px',
+      'max-height: 96px',
       'width: auto'
     ].join(' !important; ') + ' !important;';
   }

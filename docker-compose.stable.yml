@@ -372,6 +372,40 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  standard-5:
+    image: page-stream:latest
+    container_name: standard-5
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=${STANDARD_5_DISPLAY:-:108}
+      - INJECT_CSS=${STANDARD_5_INJECT_CSS:-}
+      - INJECT_JS=${STANDARD_5_INJECT_JS:-}
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
+      srt-test-listener:
+        condition: service_healthy
+    command:
+      - "--ingest"
+      - "${STANDARD_5_INGEST:-srt://srt-test-listener:9005?streamid=std5}"
+      - "--url"
+      - "${STANDARD_5_URL:-file:///app/demo/test-standard.html}"
+      - "--auto-refresh-seconds"
+      - "${DEFAULT_REFRESH_INTERVAL:-3600}"
+      - "--crop-infobar"
+      - "64"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep Xvfb && pgrep chrome && pgrep ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
   # ============================================================================
   # Video File Loop Example (direct video streaming without browser)
   # ============================================================================
