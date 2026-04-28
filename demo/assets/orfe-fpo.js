@@ -63,3 +63,40 @@
     }, 500);
   }
 })();
+
+// Apply subtle accent colors to individual FPO event listings,
+// cycling through colors sampled from the printed FPO announcement stock.
+(function accentListings() {
+  var colors = [
+    'rgb(201,140,32)',
+    'rgb(197,184,98)',
+    'rgb(227,208,162)',
+    'rgb(142,171,136)',
+    'rgb(127,155,163)',
+    'rgb(141,120,153)',
+    'rgb(182,134,131)'
+  ];
+
+  function applyColors() {
+    var items = document.querySelectorAll('.content-list-item');
+    if (!items.length) return false;
+    for (var i = 0; i < items.length; i++) {
+      var c = colors[i % colors.length];
+      items[i].style.borderLeft = '6px solid ' + c;
+      items[i].style.paddingLeft = '12px';
+      items[i].style.paddingTop = '8px';
+      items[i].style.paddingBottom = '8px';
+      items[i].style.backgroundColor = c.replace('rgb(', 'rgba(').replace(')', ',0.07)');
+    }
+    return true;
+  }
+
+  if (!applyColors()) {
+    var attempts = 0;
+    var timer = setInterval(function() {
+      if (applyColors() || ++attempts > 20) {
+        clearInterval(timer);
+      }
+    }, 500);
+  }
+})();
