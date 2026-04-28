@@ -39,13 +39,34 @@ header {
 }
 
 .block-page-title-block {
-  margin-bottom: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
 }
 
 /* Logo positioning is handled by orfe-fpo.js (inline styles) */
 
 .container {
-  max-width: 100%;
+  max-width: 100% !important;
+  width: 100% !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Override Bootstrap col-lg-10 and Drupal layout constraints to use full width */
+.main-content,
+.main-content.col-lg-10 {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.region-content,
+.block-system-main-block,
+.layout--onecol,
+.layout--onecol > .layout-container,
+.layout--onecol > .layout-container > .layout__region {
+  max-width: 100% !important;
+  width: 100% !important;
 }
 
 body.layout-block-padding-small .content-list-grid .content-list-items {
@@ -59,6 +80,7 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 .content-list-items {
     grid-template-columns: repeat(4, 1fr) !important;
     align-items: start;
+    width: 100% !important;
 }
 
 .fontset2 .field__item {
@@ -140,6 +162,15 @@ body.layout-block-padding-small .content-list-grid .content-list-items {
 .container {
   margin-top: 0;
   padding-top: 0;
+}
+
+/* Ensure content area uses full display width */
+.main-content,
+.content-list,
+.content-list-grid,
+.block-ps-events-list {
+  max-width: 100% !important;
+  width: 100% !important;
 }
 
 
