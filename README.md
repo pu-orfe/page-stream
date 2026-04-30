@@ -11,6 +11,7 @@ Page Stream loads a supplied URL or local HTML in Playwright-controlled Chromium
 - Compositor for multi-source, collage-style layouts.  See [`COMPOSITOR-ARCHITECTURE.md`](COMPOSITOR-ARCHITECTURE.md) and [`TESTING-STABLE-COMPOSITOR.md`](TESTING-STABLE-COMPOSITOR.md).
 - Scales for production operations.  See [`OPERATIONAL-NOTES.md`](OPERATIONAL-NOTES.md) for restart guidance and troubleshooting.
 - Primary support for SRT, secondary support for RTMP, extensible to other outputs (its just `ffmpeg`!).
+- **Virtual camera output (Linux)** so any client app on the host (browsers, video conferencing, OBS, etc.) can pick the stream as a webcam source.
 - **Direct video file streaming** for looping pre-recorded content without browser overhead.
 - noVNC viewer to interact with the Chromium session (disabled by default).
 - Optimized for and tested on Apple Silicon.
@@ -169,10 +170,12 @@ docker run --rm \
 ## CLI Options
 
 ```
-page-stream --ingest <URI> [options]
+page-stream (--ingest <URI> | --virtual-camera <device>) [options]
 
-Required:
-  -i, --ingest <uri>          Ingest URI (SRT/RTMP/etc)
+Output target (one of):
+  -i, --ingest <uri>            Ingest URI (SRT/RTMP/etc)
+      --virtual-camera <device> Linux v4l2loopback device path (e.g. /dev/video10)
+      --virtual-camera-pix-fmt <fmt>  Pixel format for the v4l2 device (default yuv420p)
 
 Optional:
   -u, --url <url>             Page URL or local file (default: demo)
@@ -375,6 +378,69 @@ If you encounter permission issues reading video files on macOS:
 1. Ensure the `./videos/` directory has appropriate permissions: `chmod 755 ./videos`
 2. Video files should be readable: `chmod 644 ./videos/*.mp4`
 3. If using Colima/Docker Desktop, the directory must be within a shared/mounted path
+
+## Virtual Camera Output (Linux)
+
+Stream the rendered page (or a video file) to a local virtual camera so any client app on the host — browsers, video conferencing apps, OBS, GStreamer pipelines, etc. — can pick the stream as a webcam source. This is **Linux-only** because it relies on the [`v4l2loopback`](https://github.com/v4l2loopback/v4l2loopback) kernel module. macOS support is on the roadmap but architecturally significantly heavier (it requires a CoreMediaIO DAL plugin or third-party tools like OBS's virtual camera).
+
+### One-time setup
+
+Install the kernel module:
+
+```bash
+# Debian / Ubuntu
+sudo apt install v4l2loopback-dkms
+
+# Fedora
+sudo dnf install v4l2loopback
+
+# Arch
+sudo pacman -S v4l2loopback-dkms
+```
+
+Then load it. The repo ships a helper that loads a single device at `/dev/video10` with the label `PageStream`:
+
+```bash
+sudo ./scripts/setup-virtual-camera.sh
+# or with a specific device number / label:
+sudo ./scripts/setup-virtual-camera.sh --device 12 --label "Lobby Sign"
+sudo ./scripts/setup-virtual-camera.sh --status
+sudo ./scripts/setup-virtual-camera.sh --teardown
+```
+
+### Run page-stream against it
+
+`--virtual-camera` replaces `--ingest`; you don't need both. Audio is dropped because v4l2 devices are video-only.
+
+```bash
+# Page → /dev/video10
+node dist/index.js \
+  --virtual-camera /dev/video10 \
+  --url demo/index.html \
+  --width 1280 --height 720 --fps 30
+
+# Looping video file → /dev/video10
+node dist/index.js \
+  --virtual-camera /dev/video10 \
+  --video-file ./videos/loop.mp4 --video-loop
+```
+
+To verify the device is producing frames, point any v4l2 consumer at it:
+
+```bash
+ffplay -f v4l2 /dev/video10
+# or
+vlc v4l2:///dev/video10
+```
+
+In Chromium / Firefox / Zoom / OBS / Google Meet the device appears in the camera picker under the label set when the module was loaded (default `PageStream`).
+
+### Notes & limitations
+
+- The Docker workflow defaults to network ingests; if you want to write to a host v4l2 device from inside a container you must pass `--device /dev/video10:/dev/video10` and run the container with sufficient privileges. Most users will run virtual camera mode directly on the host instead.
+- Choose a `--virtual-camera-pix-fmt` your consumers support. `yuv420p` is the broadest. Some apps prefer `yuyv422`.
+- Width and height should be even; v4l2 + `yuv420p` does not accept odd dimensions.
+- The reconnect/backoff machinery applies if the v4l2 device write briefly fails (e.g. a consumer reopens the device); use `--reconnect-attempts 0` for indefinite retries.
 
 ## Optional noVNC Viewer
 

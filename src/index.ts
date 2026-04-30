@@ -35,6 +35,8 @@ interface StreamOptions {
   injectJs?: string; // path to JS file to inject into the page
   videoFile?: string; // path to video file for direct streaming (bypasses browser)
   videoLoop: boolean; // loop video file continuously
+  virtualCamera?: string; // Linux v4l2loopback device path (e.g. /dev/video10) — output to virtual camera instead of network ingest
+  virtualCameraPixFmt?: string; // output pixel format for v4l2 device (default yuv420p)
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,6 +67,21 @@ export class PageStreamer {
   constructor(private opts: StreamOptions) {}
 
   async start() {
+    // Virtual camera output: validate platform + device once before launching ffmpeg
+    if (this.opts.virtualCamera) {
+      if (process.platform !== 'linux') {
+        throw new Error(
+          `Virtual camera output is Linux-only (requires v4l2loopback). Detected platform: ${process.platform}.`
+        );
+      }
+      if (!fs.existsSync(this.opts.virtualCamera)) {
+        throw new Error(
+          `Virtual camera device not found: ${this.opts.virtualCamera}. ` +
+          `Ensure v4l2loopback is loaded — see scripts/setup-virtual-camera.sh.`
+        );
+      }
+      console.log(`[virtual-camera] Output target: ${this.opts.virtualCamera} (pix_fmt=${this.opts.virtualCameraPixFmt || 'yuv420p'})`);
+    }
     // Direct video file mode: skip browser entirely
     if (this.opts.videoFile) {
       if (!fs.existsSync(this.opts.videoFile)) {
@@ -284,23 +301,27 @@ export class PageStreamer {
       '-video_size', `${width}x${height}`,
       '-i', display,
     ];
-    if (audioBitrate) {
-      // Silent audio source input before specifying output codecs
+    const virtualCameraOutput = !!this.opts.virtualCamera;
+    if (audioBitrate && !virtualCameraOutput) {
+      // Silent audio source input before specifying output codecs.
+      // Skipped for virtual camera output: v4l2 devices are video-only.
       args.push('-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=44100');
     }
-    // Encoding options (apply to outputs, must come after all -i inputs)
-    args.push(
-      '-c:v','libx264',
-      '-preset', preset,
-      '-tune','zerolatency',
-      '-pix_fmt','yuv420p',
-      '-b:v', videoBitrate,
-      '-maxrate', videoBitrate,
-      '-bufsize', (parseInt(videoBitrate) * 2) + 'k',
-      '-g', String(fps * 2)
-    );
-    if (audioBitrate) {
-      args.push('-c:a','aac','-b:a', audioBitrate);
+    if (!virtualCameraOutput) {
+      // Encoding options (apply to outputs, must come after all -i inputs)
+      args.push(
+        '-c:v','libx264',
+        '-preset', preset,
+        '-tune','zerolatency',
+        '-pix_fmt','yuv420p',
+        '-b:v', videoBitrate,
+        '-maxrate', videoBitrate,
+        '-bufsize', (parseInt(videoBitrate) * 2) + 'k',
+        '-g', String(fps * 2)
+      );
+      if (audioBitrate) {
+        args.push('-c:a','aac','-b:a', audioBitrate);
+      }
     }
     // Inject crop filter if requested (before user-supplied extra args so they can still override with -filter_complex later)
     if (this.opts.cropInfobar && this.opts.cropInfobar > 0) {
@@ -322,8 +343,23 @@ export class PageStreamer {
     }
     // Extra user-supplied args before container/output format
     args.push(...extraFfmpeg);
-    args.push('-f', format, ingest);
+    if (virtualCameraOutput) {
+      args.push(...this.buildVirtualCameraOutputArgs());
+    } else {
+      args.push('-f', format, ingest);
+    }
     return args;
+  }
+
+  // Output stanza for v4l2loopback: raw frames in the requested pixel format,
+  // muxed via the v4l2 output. No audio, no codec — the consuming app reads
+  // raw video from the device node like any other webcam.
+  private buildVirtualCameraOutputArgs(): string[] {
+    return [
+      '-pix_fmt', this.opts.virtualCameraPixFmt || 'yuv420p',
+      '-f', 'v4l2',
+      this.opts.virtualCamera!,
+    ];
   }
 
   private buildVideoFileArgs(): string[] {
@@ -345,10 +381,14 @@ export class PageStreamer {
     args.push('-re'); // Read input at native frame rate (real-time)
     args.push('-i', videoFile!);
 
-    // Check if the video file likely has audio (we'll let FFmpeg handle it)
-    // If no audio track exists, add silent audio source
-    // Use a filter to handle audio conditionally - simpler approach: always add null audio and map
-    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
+    const virtualCameraOutput = !!this.opts.virtualCamera;
+
+    if (!virtualCameraOutput) {
+      // Check if the video file likely has audio (we'll let FFmpeg handle it)
+      // If no audio track exists, add silent audio source
+      // Use a filter to handle audio conditionally - simpler approach: always add null audio and map
+      args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
+    }
 
     // Build filter graph: scale video to target resolution, use original audio if present or fallback to null
     const videoFilters: string[] = [];
@@ -362,38 +402,41 @@ export class PageStreamer {
 
     args.push('-vf', videoFilters.join(','));
 
-    // Encoding options
-    args.push(
-      '-c:v', 'libx264',
-      '-preset', preset,
-      '-tune', 'zerolatency',
-      '-pix_fmt', 'yuv420p',
-      '-b:v', videoBitrate,
-      '-maxrate', videoBitrate,
-      '-bufsize', (parseInt(videoBitrate) * 2) + 'k',
-      '-g', String(fps * 2)
-    );
+    if (!virtualCameraOutput) {
+      // Encoding options
+      args.push(
+        '-c:v', 'libx264',
+        '-preset', preset,
+        '-tune', 'zerolatency',
+        '-pix_fmt', 'yuv420p',
+        '-b:v', videoBitrate,
+        '-maxrate', videoBitrate,
+        '-bufsize', (parseInt(videoBitrate) * 2) + 'k',
+        '-g', String(fps * 2)
+      );
 
-    // Audio: prefer source audio (0:a) if available, otherwise use null source (1:a)
-    // Using -map with fallback: first try file audio, then null audio
-    args.push('-map', '0:v:0'); // Video from file
-    args.push('-map', '0:a:0?'); // Audio from file (optional - ? means don't fail if missing)
+      // Audio: prefer source audio (0:a) if available, otherwise use null source (1:a)
+      // Using -map with fallback: first try file audio, then null audio
+      args.push('-map', '0:v:0'); // Video from file
+      args.push('-map', '0:a:0?'); // Audio from file (optional - ? means don't fail if missing)
 
-    if (audioBitrate) {
-      args.push('-c:a', 'aac', '-b:a', audioBitrate);
+      if (audioBitrate) {
+        args.push('-c:a', 'aac', '-b:a', audioBitrate);
+      }
+    } else {
+      // Virtual camera: only video, drop the file's audio track entirely.
+      args.push('-map', '0:v:0');
     }
-
-    // For files without audio, we need a different approach
-    // Use filter_complex for conditional audio handling
-    // Simpler: let ffmpeg fail gracefully on missing audio then handle
-    // Actually simplest: always add silent audio as a fallback track
-    // We'll use -shortest to avoid issues with infinite null audio
 
     // Extra user-supplied args
     args.push(...extraFfmpeg);
 
     // Output format and destination
-    args.push('-f', format, ingest);
+    if (virtualCameraOutput) {
+      args.push(...this.buildVirtualCameraOutputArgs());
+    } else {
+      args.push('-f', format, ingest);
+    }
 
     return args;
   }
@@ -464,10 +507,11 @@ export class PageStreamer {
   }
 
   private scheduleRestartIfNeeded(code: number | null) {
-    const { ingest, reconnectAttempts, reconnectInitialDelayMs, reconnectMaxDelayMs } = this.opts;
+    const { ingest, reconnectAttempts, reconnectInitialDelayMs, reconnectMaxDelayMs, virtualCamera } = this.opts;
     if (this.stopping) return;
     if (code === 0) return; // clean exit
-    const retryProtocol = this.isRetryProtocol(ingest);
+    const target = virtualCamera || ingest;
+    const retryProtocol = this.isRetryProtocol(ingest) || !!virtualCamera;
     if (!retryProtocol) {
       console.error(`ffmpeg exited (code=${code}). Ingest protocol not configured for auto-retry. Exiting with code 11.`);
       // Give the event loop a tick so logs flush
@@ -476,14 +520,14 @@ export class PageStreamer {
     }
     // Retry path
     if (reconnectAttempts !== 0 && this.restartAttempt >= reconnectAttempts) {
-      console.error(`${this.protocolName(ingest)} reconnect attempts exhausted (${this.restartAttempt}/${reconnectAttempts}). Giving up.`);
-      this.printFailureHelp(ingest);
+      console.error(`${this.protocolName(target)} reconnect attempts exhausted (${this.restartAttempt}/${reconnectAttempts}). Giving up.`);
+      this.printFailureHelp(target);
       setTimeout(()=> process.exit(10), 10);
       return;
     }
     this.restartAttempt += 1;
     const delay = Math.min(reconnectInitialDelayMs * Math.pow(2, this.restartAttempt - 1), reconnectMaxDelayMs);
-    console.warn(`ffmpeg exited (code=${code}). Scheduling ${this.protocolName(ingest)} reconnect attempt ${this.restartAttempt} in ${delay}ms`);
+    console.warn(`ffmpeg exited (code=${code}). Scheduling ${this.protocolName(target)} reconnect attempt ${this.restartAttempt} in ${delay}ms`);
     this.restartTimer = setTimeout(() => {
       if (this.stopping) return;
       this.launchFfmpeg().catch(err => console.error('ffmpeg restart failed', err));
@@ -517,34 +561,48 @@ export class PageStreamer {
     console.error('  • Increase verbosity with: --extra-ffmpeg -loglevel verbose');
   }
 
-  private printFailureHelp(ingest: string) {
-    if (/^srt:\/\//i.test(ingest)) return this.printSrtFailureHelp(ingest);
-    if (/^rtmps?:\/\//i.test(ingest)) return this.printRtmpFailureHelp(ingest);
+  private printFailureHelp(target: string) {
+    if (/^\/dev\//.test(target)) return this.printVirtualCameraFailureHelp(target);
+    if (/^srt:\/\//i.test(target)) return this.printSrtFailureHelp(target);
+    if (/^rtmps?:\/\//i.test(target)) return this.printRtmpFailureHelp(target);
+  }
+
+  private printVirtualCameraFailureHelp(device: string) {
+    console.error('\nVirtual camera output failed permanently. Troubleshooting suggestions:');
+    console.error(`  • Confirm the device exists and is writable: ls -l ${device}`);
+    console.error('  • Confirm v4l2loopback is loaded: lsmod | grep v4l2loopback');
+    console.error('  • Reload the module with sensible defaults:');
+    console.error('      sudo ./scripts/setup-virtual-camera.sh');
+    console.error('  • Check that no other producer is currently writing to the device.');
+    console.error('  • Increase verbosity with: --extra-ffmpeg -loglevel verbose');
   }
 
   private isRetryProtocol(ingest: string) {
     return /^srt:\/\//i.test(ingest) || /^rtmps?:\/\//i.test(ingest);
   }
 
-  private protocolName(ingest: string) {
-    if (/^srt:\/\//i.test(ingest)) return 'SRT';
-    if (/^rtmps?:\/\//i.test(ingest)) return 'RTMP';
+  private protocolName(target: string) {
+    if (/^\/dev\//.test(target)) return 'V4L2';
+    if (/^srt:\/\//i.test(target)) return 'SRT';
+    if (/^rtmps?:\/\//i.test(target)) return 'RTMP';
     return 'INGEST';
   }
 
   private startHealthLoop() {
-    const { healthIntervalSeconds, ingest } = this.opts;
+    const { healthIntervalSeconds, ingest, virtualCamera } = this.opts;
     if (!healthIntervalSeconds || healthIntervalSeconds <= 0) return;
     const intervalMs = healthIntervalSeconds * 1000;
     this.healthTimer = setInterval(() => {
       const now = Date.now();
       const uptimeSec = ((now - this.startTime) / 1000).toFixed(1);
+      const target = virtualCamera || ingest;
       const payload = {
         type: 'health',
         ts: new Date().toISOString(),
         uptimeSec: Number(uptimeSec),
         ingest,
-        protocol: this.protocolName(ingest),
+        virtualCamera: virtualCamera || undefined,
+        protocol: this.protocolName(target),
         restartAttempt: this.restartAttempt,
         lastFfmpegExitCode: this.lastFfmpegExitCode,
         retrying: !!this.restartTimer,
@@ -669,8 +727,10 @@ async function main() {
   const program = new Command();
   program
     .name('page-stream')
-    .description('Stream a web page (local file or URL) to an ingest (SRT/RTMP/etc)')
-    .requiredOption('-i, --ingest <uri>', 'Ingest URI (e.g. srt://host:port?streamid=... or rtmp://...)')
+    .description('Stream a web page (local file or URL) to an ingest (SRT/RTMP/etc) or to a Linux v4l2loopback virtual camera')
+    .option('-i, --ingest <uri>', 'Ingest URI (e.g. srt://host:port?streamid=... or rtmp://...)')
+    .option('--virtual-camera <device>', 'Linux v4l2loopback device path (e.g. /dev/video10) — outputs raw video so the stream appears as a webcam to host apps')
+    .option('--virtual-camera-pix-fmt <fmt>', 'Pixel format written to the v4l2 device', 'yuv420p')
     .option('-u, --url <url>', 'Page URL or local file path', DEMO_PAGE)
   .option('--width <n>', 'Width', (v: string)=>parseInt(v,10), 1280)
   .option('--height <n>', 'Height', (v: string)=>parseInt(v,10), 720)
@@ -700,6 +760,11 @@ async function main() {
     .parse(process.argv);
 
   const opts = program.opts();
+  // Require exactly one output target: --ingest OR --virtual-camera.
+  if (!opts.ingest && !opts.virtualCamera) {
+    console.error("error: required option '-i, --ingest <uri>' or '--virtual-camera <device>' not specified");
+    process.exit(1);
+  }
   // CLI flags --inject-css/--inject-js may be omitted; allow environment fallback
   if (!opts.injectCss && process.env.INJECT_CSS) opts.injectCss = process.env.INJECT_CSS;
   if (!opts.injectJs && process.env.INJECT_JS) opts.injectJs = process.env.INJECT_JS;
@@ -719,7 +784,7 @@ async function main() {
   }
   const streamer = new PageStreamer({
     url: opts.url,
-    ingest: opts.ingest,
+    ingest: opts.ingest || '',
     width: opts.width,
     height: opts.height,
     fps: opts.fps,
@@ -743,14 +808,19 @@ async function main() {
     injectJs: opts.injectJs,
     videoFile: opts.videoFile,
     videoLoop: !!opts.videoLoop,
+    virtualCamera: opts.virtualCamera,
+    virtualCameraPixFmt: opts.virtualCameraPixFmt || 'yuv420p',
   });
 
 
   // Print early log before heavy startup so tests can assert output.
+  const target = opts.virtualCamera
+    ? `virtual camera '${opts.virtualCamera}'`
+    : `ingest '${opts.ingest}'`;
   if (opts.videoFile) {
-    console.log(`Streaming video file '${opts.videoFile}' to ingest '${opts.ingest}' (${opts.width}x${opts.height}@${opts.fps}fps${opts.videoLoop ? ', loop' : ''})`)
+    console.log(`Streaming video file '${opts.videoFile}' to ${target} (${opts.width}x${opts.height}@${opts.fps}fps${opts.videoLoop ? ', loop' : ''})`);
   } else {
-    console.log(`Streaming page '${opts.url}' to ingest '${opts.ingest}' (${opts.width}x${opts.height}@${opts.fps}fps)`);
+    console.log(`Streaming page '${opts.url}' to ${target} (${opts.width}x${opts.height}@${opts.fps}fps)`);
   }
 
   if (process.env.PAGE_STREAM_TEST_MODE) {
