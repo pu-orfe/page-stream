@@ -1,7 +1,9 @@
-/* Shift page up to compensate for Chrome infobar eating viewport space.
-   The crop-infobar removes the top 64px from capture, so we shift content
-   up to reclaim that space at the bottom for the footer. */
+/* Scale the page to fit the full 1080px design into the available viewport
+   after Chrome infobar + crop-infobar 64 reduce the visible area to ~1016px.
+   This preserves both the header and footer without clipping either. */
 body {
-  margin-top: -64px !important;
-  padding-top: 0 !important;
+  transform: scale(0.94) !important;
+  transform-origin: top center !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
