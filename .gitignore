@@ -10,6 +10,7 @@ out/
 CLAUDE.md
 AGENTS.md
 .claude/
+.antigravitycli/
 # Video files directory (keep .gitkeep, ignore video files)
 videos/*
 !videos/.gitkeep
