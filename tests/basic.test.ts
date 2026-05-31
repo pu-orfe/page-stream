@@ -7,7 +7,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const root = path.join(__dirname, '..');
+
+let root = __dirname;
+while (root !== '/' && !fs.existsSync(path.join(root, 'package.json'))) {
+  root = path.dirname(root);
+}
+
 
 // Simple tests just exercising CLI argument parsing and fallback logic
 

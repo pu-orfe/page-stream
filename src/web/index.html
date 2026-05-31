@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Premium control dashboard for managing headless web page compositing and RTMP/SRT video streamers.">
+  <title>Page Stream | Control Plane Dashboard</title>
+  <!-- Google Fonts Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="glow-orb glow-orb-1" id="glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2" id="glow-orb-2"></div>
+
+  <!-- Dashboard Wrapper -->
+  <div class="dashboard-container">
+    
+    <!-- Top Header Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1 id="app-title">Page Stream</h1>
+          <p class="subtitle">Broadcast Control Center</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <div class="status-indicator-badge">
+          <span class="pulse-dot green"></span>
+          <span id="api-status-text">Connected to API</span>
+        </div>
+        <button class="btn btn-primary" id="btn-global-refresh" onclick="refreshAllData()">
+          <span class="btn-icon">🔄</span> Reload Status
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Summary Section -->
+    <section class="metrics-grid" aria-label="System Metrics">
+      <div class="metric-card" id="metric-active-streams">
+        <div class="metric-header">
+          <span class="metric-title">Active Streams</span>
+          <span class="metric-badge">Live</span>
+        </div>
+        <div class="metric-value" id="active-count">0</div>
+        <p class="metric-footer">Streams currently broadcasting</p>
+      </div>
+      
+      <div class="metric-card" id="metric-system-uptime">
+        <div class="metric-header">
+          <span class="metric-title">Server Uptime</span>
+          <span class="metric-icon">⏰</span>
+        </div>
+        <div class="metric-value" id="total-uptime">0m</div>
+        <p class="metric-footer">Continuous monitoring active</p>
+      </div>
+
+      <div class="metric-card" id="metric-network-health">
+        <div class="metric-header">
+          <span class="metric-title">Control Mode</span>
+          <span class="metric-icon">🔧</span>
+        </div>
+        <div class="metric-value text-accent" id="control-mode">Docker</div>
+        <p class="metric-footer">Orchestrated environment</p>
+      </div>
+    </section>
+
+    <!-- Main Content Area: Streams and Inspector -->
+    <main class="dashboard-main">
+      
+      <!-- Streams Grid Panel -->
+      <section class="streams-section" aria-label="Streaming Channels">
+        <h2 class="section-title">Streaming Instances</h2>
+        <div class="streams-grid" id="streams-grid-container">
+          <!-- Dynamically populated stream cards will appear here -->
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Scanning active broadcast channels...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Logs / Details Panel -->
+      <section class="details-section" aria-label="Console Logs & Details">
+        <div class="details-card">
+          <h2 class="section-title">Stream Console & Diagnostics</h2>
+          <div class="stream-inspector">
+            <div class="inspector-meta">
+              <span class="label">Selected Channel:</span>
+              <strong id="selected-stream-name">None Selected</strong>
+            </div>
+            
+            <!-- Dynamic Logs Box -->
+            <div class="logs-console" id="logs-output">
+              <span class="log-placeholder">Click a stream card to fetch live execution logs and status diagnostics.</span>
+            </div>
+
+            <!-- Terminal controls -->
+            <div class="console-controls">
+              <button class="btn btn-secondary btn-sm" id="btn-clear-logs" onclick="clearInspector()">Clear Display</button>
+              <button class="btn btn-secondary btn-sm" id="btn-copy-logs" onclick="copyInspectorLogs()">Copy Logs</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Glassmorphic Modal Dialog for URL editing -->
+  <div class="modal-overlay" id="edit-url-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit Stream Source URL</h3>
+        <button class="close-btn" id="btn-modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <form id="url-update-form" onsubmit="submitUrlUpdate(event)">
+        <input type="hidden" id="modal-stream-id">
+        <div class="form-group">
+          <label for="input-stream-url">Source Address (URL or Local File)</label>
+          <input type="text" id="input-stream-url" required placeholder="https://example.com/custom-broadcast">
+          <p class="form-help">Updating the URL will rebuild/restart the container with the environment override.</p>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-modal-submit">Apply Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Javascript -->
+  <script src="app.js"></script>
+</body>
+</html>

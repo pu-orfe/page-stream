@@ -8,7 +8,12 @@ import { PageStreamer } from '../src/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const root = path.join(__dirname, '..');
+
+let root = __dirname;
+while (root !== '/' && !fs.existsSync(path.join(root, 'package.json'))) {
+  root = path.dirname(root);
+}
+
 
 // Tests for direct video file streaming feature
 
