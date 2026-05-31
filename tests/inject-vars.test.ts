@@ -17,7 +17,7 @@ function waitFor(pattern: RegExp, source: () => string, timeoutMs=3000, interval
 
 test('entrypoint honors per-container INJECT_CSS/INJECT_JS env vars', async () => {
   const ep = spawn('bash', ['./scripts/entrypoint.sh','--ingest','srt://dummy?streamid=test'], {
-    env: { ...process.env, PAGE_STREAM_TEST_MODE: '1', STANDARD_1_INJECT_CSS: '/out/demo/assets/inject.css', STANDARD_1_INJECT_JS: '/out/demo/assets/inject.js' },
+    env: { ...process.env, PAGE_STREAM_TEST_MODE: '1', LIGHTWEIGHT_NOVNC: '1', STANDARD_1_INJECT_CSS: '/out/demo/assets/inject.css', STANDARD_1_INJECT_JS: '/out/demo/assets/inject.js' },
     stdio: ['ignore','pipe','pipe']
   });
   let stdout=''; let stderr='';
