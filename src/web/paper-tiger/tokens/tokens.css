@@ -1,0 +1,161 @@
+/*
+ * Paper Tiger — design tokens (CSS custom properties)
+ * Distilled from orfe.princeton.edu (Drupal 10, ps_tiger theme).
+ * Active site flavor: fontset2 (sofia-pro + abril-text), flavor1, menu1, btn-v1.
+ *
+ * Drop this file into a companion app to inherit ORFE-compatible visuals.
+ * All tokens are scoped to :root so they cascade unmodified.
+ */
+
+:root {
+  /* ---------- Color: Princeton Orange brand scale ---------- */
+  --color-brand-100: #411C02;
+  --color-brand-90:  #6D2E03;
+  --color-brand-80:  #C1560E;
+  --color-brand-70:  #e77500;   /* Princeton Orange — primary accent */
+  --color-brand-60:  #F7964A;
+  --color-brand-20:  #FEECDE;
+  --color-brand-10:  #FFF7F2;
+
+  /* Action mirrors brand on Tiger */
+  --color-action-100: var(--color-brand-100);
+  --color-action-90:  var(--color-brand-90);
+  --color-action-80:  var(--color-brand-80);
+  --color-action-70:  var(--color-brand-70);
+  --color-action-60:  var(--color-brand-60);
+  --color-action-20:  var(--color-brand-20);
+  --color-action-10:  var(--color-brand-10);
+
+  /* ---------- Color: neutrals ---------- */
+  --color-neutral-5:   #f7f7f7;
+  --color-neutral-10:  #eeeeee;
+  --color-neutral-20:  #D9D9D9;
+  --color-neutral-40:  #a0a0a0;
+  --color-neutral-60:  #717171;
+  --color-neutral-85:  #333333;
+  --color-neutral-90:  #1d1d1d;
+  --color-neutral-100: #121212;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-ink:   var(--color-neutral-85);
+
+  /* WCAG keyboard focus ring */
+  --color-focus-outline: #3b99fc;
+
+  /* ---------- Typography (ORFE Fontset 2) ---------- */
+  --font-display: "sofia-pro", "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --font-body:    "abril-text", "Lora", Georgia, "Times New Roman", serif;
+  --font-label:   "sofia-pro", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --font-ui:      "sofia-pro", "Montserrat", sans-serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Aliases for compatibility */
+  --fontset2-display: var(--font-display);
+  --fontset2-title:   var(--font-display);
+  --fontset2-body:    var(--font-body);
+  --fontset2-label:   var(--font-label);
+
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  --font-size-xs:   0.85rem;
+  --font-size-sm:   0.9375rem;
+  --font-size-base: 1rem;
+  --font-size-md:   1.125rem;
+  --font-size-lg:   1.25rem;
+  --font-size-xl:   1.5rem;
+  --font-size-h3:   1.8rem;
+  --font-size-h2:   2.125rem;
+  --font-size-h1:   3.35rem;
+  --font-size-h1-sm: 2.0625rem;
+
+  --line-tight:   1.1;
+  --line-snug:    1.3;
+  --line-normal:  1.5;
+  --line-relaxed: 1.6;
+
+  /* ---------- Spacing ---------- */
+  --space-0:  0;
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---------- Radius ---------- */
+  --radius-none:   0;
+  --radius-sm:     0.25rem;
+  --radius-md:     0.5rem;
+  --radius-pill:   2rem;
+  --radius-circle: 50%;
+  --btn-border-radius: var(--radius-none);
+
+  /* ---------- Borders / shadows ---------- */
+  --border-footer-accent: 5px solid var(--color-brand-70);
+  --border-subfooter:     1px solid var(--color-neutral-90);
+  --shadow-focus:         0 0 0 3px var(--color-focus-outline);
+
+  /* ---------- Layout ---------- */
+  --container-max:     90rem;
+  --container-gutter:  1rem;
+  --container-tablet:  48rem;
+  --container-desktop: 62rem;
+
+  /* Breakpoints */
+  --bp-xs:      20rem;
+  --bp-sm:      25rem;
+  --bp-md:      36rem;
+  --bp-tablet:  48rem;
+  --bp-lg:      55.5rem;
+  --bp-desktop: 62rem;
+  --bp-xl:      75rem;
+  --bp-xxl:     90rem;
+}
+
+html { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  background: var(--color-white);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-neutral-100);
+  margin: 1.5rem 0 0.75rem;
+}
+h1 { font-size: var(--font-size-h1-sm); font-weight: var(--font-weight-medium); line-height: var(--line-tight); }
+@media (min-width: 48rem) {
+  h1 { font-size: var(--font-size-h1); }
+}
+h2 { font-size: var(--font-size-h2); font-weight: var(--font-weight-bold); line-height: 1.3; }
+h3 { font-size: var(--font-size-h3); font-weight: var(--font-weight-regular); line-height: 1.31; }
+h4 { font-size: 1.5rem; font-weight: var(--font-weight-bold); }
+h5 { font-size: 1.375rem; font-weight: var(--font-weight-regular); text-transform: uppercase; letter-spacing: 0.02em; }
+h6 { font-size: 1.25rem; font-weight: var(--font-weight-bold); }
+
+p { margin: 0.75rem 0; }
+
+a {
+  color: var(--color-brand-90);
+  text-underline-offset: 2px;
+}
+a:hover, a:focus { color: var(--color-brand-70); }
+a:focus-visible { outline: 2px solid var(--color-focus-outline); outline-offset: 2px; }
+
+::selection { background: var(--color-brand-20); color: var(--color-neutral-100); }
+

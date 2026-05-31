@@ -3,80 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Premium control dashboard for managing headless web page compositing and RTMP/SRT video streamers.">
-  <title>Page Stream | Control Plane Dashboard</title>
-  <!-- Google Fonts Outfit & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <!-- Stylesheet -->
+  <meta name="description" content="Princeton ORFE Page Stream control dashboard for managing headless web page compositing and streaming pipelines.">
+  <title>Page Stream Control Plane | Princeton ORFE</title>
+  
+  <!-- Adobe Typekit display family for ORFE (mxl1ncs covers Sofia Pro display fonts) -->
+  <link rel="stylesheet" href="https://use.typekit.net/mxl1ncs.css">
+  
+  <!-- Paper Tiger Design System Stylesheets -->
+  <link rel="stylesheet" href="paper-tiger/tokens/tokens.css">
+  <link rel="stylesheet" href="paper-tiger/tokens/fonts.css">
+  <link rel="stylesheet" href="paper-tiger/components/layout.css">
+  <link rel="stylesheet" href="paper-tiger/components/header.css">
+  <link rel="stylesheet" href="paper-tiger/components/footer.css">
+  <link rel="stylesheet" href="paper-tiger/components/buttons.css">
+  <link rel="stylesheet" href="paper-tiger/components/cards.css">
+  <link rel="stylesheet" href="paper-tiger/components/forms.css">
+  
+  <!-- Custom control plane bridge styling -->
   <link rel="stylesheet" href="index.css">
 </head>
 <body>
-  <!-- Ambient background glow elements -->
-  <div class="glow-orb glow-orb-1" id="glow-orb-1"></div>
-  <div class="glow-orb glow-orb-2" id="glow-orb-2"></div>
 
-  <!-- Dashboard Wrapper -->
-  <div class="dashboard-container">
-    
-    <!-- Top Header Bar -->
-    <header class="app-header">
-      <div class="brand">
-        <span class="logo-icon">⚡</span>
-        <div>
-          <h1 id="app-title">Page Stream</h1>
-          <p class="subtitle">Broadcast Control Center</p>
-        </div>
+  <!-- Princeton Branding Header -->
+  <header class="pt-header" role="banner">
+    <!-- Princeton Bar (black background, orange logo) -->
+    <div class="pt-princeton-bar">
+      <div class="pt-container">
+        <a href="https://www.princeton.edu" class="pt-pu-logo" title="Princeton University">
+          <img src="paper-tiger/assets/logos/pu-logo.svg" alt="Princeton University" />
+        </a>
       </div>
+    </div>
+
+    <!-- Site Identity (White background, ORFE branding) -->
+    <div class="pt-site-branding">
+      <div class="pt-container pt-site-branding__row">
+        <div class="pt-site-logo-group">
+          <a href="/" class="pt-site-logo" rel="home">
+            <img src="paper-tiger/assets/logos/orfe-logo.png" alt="ORFE" />
+          </a>
+          <div class="pt-site-info">
+            <p class="pt-site-name"><a href="/" rel="home">Page Stream</a></p>
+            <p class="pt-site-slogan">Broadcasting Companion &amp; Control Center</p>
+          </div>
+        </div>
+        <!-- Princeton SEAS Engineering lockup -->
+        <a href="https://engineering.princeton.edu" class="pt-seas-lockup">
+          <img src="paper-tiger/assets/logos/princeton-engineering-linear-white.png"
+               alt="School of Engineering and Applied Science" />
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Section Wrapper -->
+  <main id="main" class="pt-container pt-section">
+    
+    <!-- Title and Toolbar Area -->
+    <div class="pt-section__head">
+      <h1 class="pt-section__title">Stream Control Center</h1>
       <div class="header-status">
         <div class="status-indicator-badge">
           <span class="pulse-dot green"></span>
           <span id="api-status-text">Connected to API</span>
         </div>
-        <button class="btn btn-primary" id="btn-global-refresh" onclick="refreshAllData()">
-          <span class="btn-icon">🔄</span> Reload Status
+        <button class="pt-btn pt-btn--primary" id="btn-global-refresh" onclick="refreshAllData()">
+          Reload Status
         </button>
       </div>
-    </header>
+    </div>
 
-    <!-- Metrics Summary Section -->
-    <section class="metrics-grid" aria-label="System Metrics">
-      <div class="metric-card" id="metric-active-streams">
-        <div class="metric-header">
-          <span class="metric-title">Active Streams</span>
-          <span class="metric-badge">Live</span>
-        </div>
-        <div class="metric-value" id="active-count">0</div>
-        <p class="metric-footer">Streams currently broadcasting</p>
+    <!-- Summary Metrics Dashboard Grid -->
+    <section class="metrics-summary-grid" aria-label="System Metrics">
+      <div class="summary-metric-card" id="metric-active-streams">
+        <span class="metric-label">Active Streams</span>
+        <span class="metric-value" id="active-count">0</span>
       </div>
-      
-      <div class="metric-card" id="metric-system-uptime">
-        <div class="metric-header">
-          <span class="metric-title">Server Uptime</span>
-          <span class="metric-icon">⏰</span>
-        </div>
-        <div class="metric-value" id="total-uptime">0m</div>
-        <p class="metric-footer">Continuous monitoring active</p>
+      <div class="summary-metric-card" id="metric-system-uptime">
+        <span class="metric-label">Uptime</span>
+        <span class="metric-value" id="total-uptime">0m</span>
       </div>
-
-      <div class="metric-card" id="metric-network-health">
-        <div class="metric-header">
-          <span class="metric-title">Control Mode</span>
-          <span class="metric-icon">🔧</span>
-        </div>
-        <div class="metric-value text-accent" id="control-mode">Docker</div>
-        <p class="metric-footer">Orchestrated environment</p>
+      <div class="summary-metric-card" id="metric-network-health">
+        <span class="metric-label">Orchestrator Mode</span>
+        <span class="metric-value" id="control-mode" style="color: var(--color-brand-70);">Docker</span>
       </div>
     </section>
 
-    <!-- Main Content Area: Streams and Inspector -->
-    <main class="dashboard-main">
+    <!-- Main Workspace Grid: Cards and Logs -->
+    <div class="workspace-grid">
       
       <!-- Streams Grid Panel -->
-      <section class="streams-section" aria-label="Streaming Channels">
-        <h2 class="section-title">Streaming Instances</h2>
-        <div class="streams-grid" id="streams-grid-container">
+      <section class="streams-panel" aria-label="Active Streams">
+        <h2 class="workspace-section-title">Streaming Channels</h2>
+        <div class="streams-list-grid" id="streams-grid-container">
           <!-- Dynamically populated stream cards will appear here -->
           <div class="loading-state">
             <div class="spinner"></div>
@@ -86,32 +105,29 @@
       </section>
 
       <!-- Logs / Details Panel -->
-      <section class="details-section" aria-label="Console Logs & Details">
-        <div class="details-card">
-          <h2 class="section-title">Stream Console & Diagnostics</h2>
-          <div class="stream-inspector">
-            <div class="inspector-meta">
-              <span class="label">Selected Channel:</span>
-              <strong id="selected-stream-name">None Selected</strong>
-            </div>
-            
-            <!-- Dynamic Logs Box -->
-            <div class="logs-console" id="logs-output">
-              <span class="log-placeholder">Click a stream card to fetch live execution logs and status diagnostics.</span>
-            </div>
+      <section class="details-panel" aria-label="Console Logs & Details">
+        <h2 class="workspace-section-title">Stream Console &amp; Diagnostics</h2>
+        <div class="console-box-container">
+          <div class="console-meta-header">
+            <span class="label">Channel:</span>
+            <strong id="selected-stream-name">None Selected</strong>
+          </div>
+          
+          <!-- Dynamic Logs Box -->
+          <div class="console-logs-display" id="logs-output">
+            <span class="log-placeholder">Select a stream card to load and tail execution console logs.</span>
+          </div>
 
-            <!-- Terminal controls -->
-            <div class="console-controls">
-              <button class="btn btn-secondary btn-sm" id="btn-clear-logs" onclick="clearInspector()">Clear Display</button>
-              <button class="btn btn-secondary btn-sm" id="btn-copy-logs" onclick="copyInspectorLogs()">Copy Logs</button>
-            </div>
+          <!-- Console actions -->
+          <div class="console-actions">
+            <button class="pt-btn" id="btn-clear-logs" onclick="clearInspector()" style="font-size: var(--font-size-xs);">Clear</button>
+            <button class="pt-btn" id="btn-copy-logs" onclick="copyInspectorLogs()" style="font-size: var(--font-size-xs);">Copy Logs</button>
           </div>
         </div>
       </section>
 
-    </main>
-
-  </div>
+    </div>
+  </main>
 
   <!-- Glassmorphic Modal Dialog for URL editing -->
   <div class="modal-overlay" id="edit-url-modal">
@@ -125,15 +141,63 @@
         <div class="form-group">
           <label for="input-stream-url">Source Address (URL or Local File)</label>
           <input type="text" id="input-stream-url" required placeholder="https://example.com/custom-broadcast">
-          <p class="form-help">Updating the URL will rebuild/restart the container with the environment override.</p>
+          <p class="form-help">Updating the URL will restart the container with the environment variable override.</p>
         </div>
         <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-modal-submit">Apply Changes</button>
+          <button type="button" class="pt-btn" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="pt-btn pt-btn--primary" id="btn-modal-submit">Apply Changes</button>
         </div>
       </form>
     </div>
   </div>
+
+  <!-- Princeton Footer Component -->
+  <footer class="pt-footer" role="contentinfo">
+    <div class="pt-container">
+      <div class="pt-footer__grid">
+        <!-- Column 1: address + service links -->
+        <section class="pt-footer__col">
+          <p>
+            <strong>Operations Research &amp; Financial Engineering</strong><br/>
+            Sherrerd Hall, Charlton Street, Princeton, NJ 08544 · 609-258-0100
+          </p>
+          <p class="pt-disclaimer" style="margin-top: 1rem;">
+            Control plane console for monitoring ORFE's headless browser web streams.
+          </p>
+        </section>
+
+        <!-- Column 2: links -->
+        <section class="pt-footer__col">
+          <ul class="pt-social-links pt-social-links--vertical" role="list">
+            <li><span class="pt-icon">📺</span><span>Live Broadcast Feeds</span></li>
+            <li><span class="pt-icon">🖥</span><span>Main Compositor Terminal</span></li>
+          </ul>
+        </section>
+
+        <!-- Column 3: disclaimer + SEAS -->
+        <section class="pt-footer__col">
+          <p class="pt-disclaimer">
+            This dashboard complies with Princeton's companion app design style guide.
+          </p>
+          <a href="https://engineering.princeton.edu" class="pt-seas-stacked">
+            <img src="paper-tiger/assets/logos/princeton-engineering-stacked-white.png"
+                 alt="School of Engineering and Applied Science" />
+          </a>
+        </section>
+      </div>
+
+      <div class="pt-subfooter">
+        <ul class="pt-subfooter__links" role="list">
+          <li><a href="https://inclusive.princeton.edu/about/our-commitment-equal-opportunity-and-non-discrimination">Diversity &amp; Non-Discrimination</a></li>
+          <li><a href="https://accessibility.princeton.edu/help">Accessibility Help</a></li>
+        </ul>
+        <p class="pt-subfooter__copy">© <span id="pt-year">2026</span> The Trustees of Princeton University</p>
+        <a href="https://www.princeton.edu" class="pt-subfooter__shield" title="Princeton University">
+          <img src="paper-tiger/assets/logos/pu-logo-stacked.svg" alt="Princeton University" />
+        </a>
+      </div>
+    </div>
+  </footer>
 
   <!-- App Javascript -->
   <script src="app.js"></script>

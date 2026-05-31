@@ -1,0 +1,97 @@
+<!--
+  Paper Tiger — content list & card patterns
+  Three flavors taken from ORFE:
+    1. Compact list      (no image, title + meta) — homepage News column
+    2. 3x4 image card    (portrait image on top, title underneath)  — /news index
+    3. Person card       (square headshot, name, title, contact)   — /people
+  Wrap any of these in a section with .pt-section for vertical rhythm.
+-->
+
+<section class="pt-section">
+  <header class="pt-section__head">
+    <h2 class="pt-section__title">News</h2>
+    <a href="/news" class="pt-link-more">All news</a>
+  </header>
+
+  <!-- Pattern 1: compact list -->
+  <ol class="pt-list pt-list--compact" role="list">
+    <li class="pt-list__item">
+      <a class="pt-list__title" href="/news/example-1">
+        Professor Jane Doe elected to the National Academy of Sciences
+      </a>
+      <p class="pt-list__meta">April 29, 2026</p>
+    </li>
+    <li class="pt-list__item">
+      <a class="pt-list__title" href="/news/example-2">
+        Two graduate students receive 2025 Excellence in Teaching Awards
+      </a>
+      <p class="pt-list__meta">April 20, 2026</p>
+    </li>
+  </ol>
+</section>
+
+<!-- Pattern 2: image-card grid (3 columns on desktop) -->
+<section class="pt-section">
+  <ul class="pt-card-grid" role="list">
+    <li>
+      <article class="pt-card pt-card--3x4">
+        <a class="pt-card__media" href="/news/example-1">
+          <img src="/news/example-1.jpg" alt="" loading="lazy" />
+        </a>
+        <div class="pt-card__body">
+          <h3 class="pt-card__title">
+            <a href="/news/example-1">Professor Jane Doe elected to the National Academy of Sciences</a>
+          </h3>
+          <p class="pt-card__meta">April 29, 2026</p>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="pt-card pt-card--3x4">
+        <a class="pt-card__media" href="/news/example-2">
+          <img src="/news/example-2.jpg" alt="" loading="lazy" />
+        </a>
+        <div class="pt-card__body">
+          <h3 class="pt-card__title">
+            <a href="/news/example-2">Two graduate students receive 2025 Excellence in Teaching Awards</a>
+          </h3>
+          <p class="pt-card__meta">April 20, 2026</p>
+        </div>
+      </article>
+    </li>
+    <li>
+      <article class="pt-card pt-card--3x4">
+        <a class="pt-card__media" href="/news/example-3">
+          <img src="/news/example-3.jpg" alt="" loading="lazy" />
+        </a>
+        <div class="pt-card__body">
+          <h3 class="pt-card__title">
+            <a href="/news/example-3">Two ORFE Professors Receive Great Teaching Awards</a>
+          </h3>
+          <p class="pt-card__meta">March 19, 2026</p>
+        </div>
+      </article>
+    </li>
+  </ul>
+</section>
+
+<!-- Pattern 3: person card (mosaic-friendly square headshot) -->
+<section class="pt-section">
+  <ul class="pt-card-grid pt-card-grid--people" role="list">
+    <li>
+      <article class="pt-person-card">
+        <a class="pt-person-card__photo" href="/people/jane-doe">
+          <img src="/people/jane-doe.jpg" alt="Jane Doe" loading="lazy" />
+        </a>
+        <div class="pt-person-card__body">
+          <h3 class="pt-person-card__name"><a href="/people/jane-doe">Jane Doe</a></h3>
+          <p class="pt-person-card__title">Professor of Operations Research and Financial Engineering</p>
+          <p class="pt-person-card__contact">
+            <a href="mailto:jdoe@princeton.edu">jdoe@princeton.edu</a><br/>
+            Sherrerd 312
+          </p>
+        </div>
+      </article>
+    </li>
+  </ul>
+</section>
