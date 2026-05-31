@@ -1,0 +1,36 @@
+<!--
+  Paper Tiger — hero / content slider
+  Mirrors the homepage ps_content_slider: 16:9 imagery, lower-left caption,
+  numeric pager, prev/next chevrons. Render server-side or wire up with the
+  scaffold script in components/hero.js.
+-->
+<section class="pt-hero" aria-roledescription="carousel" aria-label="Featured stories">
+  <ol class="pt-hero__slides" role="list">
+    <li class="pt-hero__slide is-current" aria-label="slide 1 of 3">
+      <a class="pt-hero__media" href="/news/example-1" aria-hidden="true" tabindex="-1">
+        <img src="/news/example-1-1440.jpg" alt="" loading="eager" />
+      </a>
+      <div class="pt-hero__caption">
+        <p class="pt-hero__date">Spotlight</p>
+        <h2 class="pt-hero__title">
+          <a href="/news/example-1">ORFE Research Leads the Way in Sustainable Finance</a>
+        </h2>
+      </div>
+    </li>
+    <!-- additional slides -->
+  </ol>
+
+  <div class="pt-hero__controls">
+    <p class="pt-hero__counter" aria-live="polite">
+      <span class="pt-hero__current">1</span> / <span class="pt-hero__total">3</span>
+    </p>
+    <div class="pt-hero__buttons">
+      <button type="button" class="pt-hero__btn pt-hero__btn--play" data-action="toggle" title="Pause">
+        <span class="sr-only">Pause animation</span>⏸
+      </button>
+      <button type="button" class="pt-hero__btn" data-action="prev" aria-label="Previous slide">←</button>
+      <button type="button" class="pt-hero__btn" data-action="next" aria-label="Next slide">→</button>
+    </div>
+  </div>
+</section>
+

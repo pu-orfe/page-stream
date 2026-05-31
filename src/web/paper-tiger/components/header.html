@@ -1,0 +1,87 @@
+<!--
+  Paper Tiger — site header
+  Mirrors the ORFE structure: Princeton branding strip → site logo + name →
+  primary nav with collapsible submenus → utility nav → search.
+  Pair with components/header.css.
+-->
+<header class="pt-header" role="banner">
+  <a href="#main" class="pt-skiplink">Skip to content</a>
+
+  <!-- Princeton bar (orange-on-black wordmark, 1.25rem padding) -->
+  <div class="pt-princeton-bar">
+    <div class="pt-container">
+      <a href="https://www.princeton.edu" class="pt-pu-logo" title="Princeton University">
+        <img src="/assets/logos/pu-logo.svg" alt="Princeton University" />
+      </a>
+    </div>
+  </div>
+
+  <!-- Site identity -->
+  <div class="pt-site-branding">
+    <div class="pt-container pt-site-branding__row">
+      <div class="pt-site-logo-group">
+        <a href="/" class="pt-site-logo" rel="home">
+          <img src="/assets/logos/orfe-logo.png" alt="ORFE" />
+        </a>
+        <div class="pt-site-info">
+          <p class="pt-site-name"><a href="/" rel="home">Paper Tiger</a></p>
+          <p class="pt-site-slogan">A design kit for ORFE companion apps</p>
+        </div>
+      </div>
+      <!-- Optional School of Engineering lockup, right-aligned on desktop -->
+      <a href="https://engineering.princeton.edu" class="pt-seas-lockup">
+        <img src="/assets/logos/princeton-engineering-linear-white.png"
+             alt="School of Engineering and Applied Science" />
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary navigation -->
+  <nav class="pt-main-menu" aria-label="Main">
+    <div class="pt-container">
+      <button class="pt-nav-toggle" type="button"
+              aria-controls="pt-menu" aria-expanded="false">
+        <span class="pt-nav-toggle__label">Menu</span>
+        <span aria-hidden="true">☰</span>
+      </button>
+
+      <div id="pt-menu" class="pt-nav-collapse">
+        <ul class="pt-nav pt-nav--main" role="list">
+          <li class="pt-nav__item">
+            <a href="/section-a">Section A</a>
+            <button class="pt-submenu-toggle" type="button" aria-expanded="false">
+              <span class="sr-only">Submenu</span>+
+            </button>
+            <ul class="pt-submenu" role="list">
+              <li><a href="/section-a/one">One</a></li>
+              <li><a href="/section-a/two">Two</a></li>
+            </ul>
+          </li>
+          <li class="pt-nav__item"><a href="/section-b">Section B</a></li>
+          <li class="pt-nav__item"><a href="/section-c">Section C</a></li>
+        </ul>
+
+        <ul class="pt-nav pt-nav--utility" role="list">
+          <li><a href="/news">News</a></li>
+          <li><a href="/events">Events</a></li>
+          <li><a href="/login" class="pt-login-link">Log in</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Search bar -->
+  <div class="pt-search-bar">
+    <div class="pt-container">
+      <button class="pt-search-toggle" type="button"
+              aria-controls="pt-search" aria-expanded="false" aria-label="Toggle search">
+        <span aria-hidden="true">🔍</span>
+      </button>
+      <form id="pt-search" class="pt-search-form" action="/search" method="get" role="search">
+        <label for="pt-q" class="sr-only">Search</label>
+        <input id="pt-q" type="search" name="q" placeholder="Search" />
+        <button type="submit" class="pt-btn pt-btn--primary">Submit</button>
+      </form>
+    </div>
+  </div>
+</header>
