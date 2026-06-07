@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -78,7 +78,7 @@ function getDockerComposeStreams(): StreamStatus[] {
 
   try {
     // Check if docker-compose command is available
-    execSync('docker-compose --version', { stdio: 'ignore' });
+    execFileSync('docker-compose', ['--version'], { stdio: 'ignore' });
   } catch {
     console.warn('[control-api] docker-compose not found, falling back to mock data');
     useMock = true;
@@ -87,7 +87,7 @@ function getDockerComposeStreams(): StreamStatus[] {
 
   try {
     // Query docker-compose for container statuses
-    const output = execSync(`docker-compose -f ${COMPOSE_FILE} ps --format json`, { encoding: 'utf8' });
+    const output = execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'ps', '--format', 'json'], { encoding: 'utf8' });
     const containers = JSON.parse(`[${output.trim().replace(/\n/g, ',')}]`);
     
     // Map docker-compose output to our StreamStatus structures
@@ -138,13 +138,13 @@ function handleRefresh(streamId: string): boolean {
     const target = streams.find(s => s.id === streamId);
     if (!target) return false;
 
-    execSync(`docker-compose -f ${COMPOSE_FILE} exec -T ${streamId} sh -c "echo refresh > /tmp/page_refresh_fifo"`, { stdio: 'ignore' });
+    execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'exec', '-T', streamId, 'sh', '-c', 'echo refresh > /tmp/page_refresh_fifo'], { stdio: 'ignore' });
     return true;
   } catch (err: any) {
     console.error(`[control-api] Failed to refresh ${streamId}:`, err.message);
     // Fallback: send SIGHUP
     try {
-      execSync(`docker-compose -f ${COMPOSE_FILE} kill -s HUP ${streamId}`, { stdio: 'ignore' });
+      execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'kill', '-s', 'HUP', streamId], { stdio: 'ignore' });
       return true;
     } catch {
       return false;
@@ -167,7 +167,7 @@ function handleRestart(streamId: string): boolean {
   }
 
   try {
-    execSync(`docker-compose -f ${COMPOSE_FILE} restart ${streamId}`, { stdio: 'ignore' });
+    execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'restart', streamId], { stdio: 'ignore' });
     return true;
   } catch (err: any) {
     console.error(`[control-api] Failed to restart ${streamId}:`, err.message);
@@ -190,8 +190,11 @@ function handleSetUrl(streamId: string, url: string): boolean {
     // Recreate container with environment variable override
     // We can do this by setting env and executing compose up -d
     const envVarName = `${streamId.toUpperCase().replace(/-/g, '_')}_URL`;
-    const command = `${envVarName}='${url}' docker-compose -f ${COMPOSE_FILE} up -d ${streamId}`;
-    execSync(command, { stdio: 'ignore' });
+    const env = { ...process.env, [envVarName]: url };
+    execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'up', '-d', streamId], {
+      env,
+      stdio: 'ignore'
+    });
     return true;
   } catch (err: any) {
     console.error(`[control-api] Failed to set URL for ${streamId}:`, err.message);
@@ -205,7 +208,7 @@ function getLogs(streamId: string): string {
   }
 
   try {
-    return execSync(`docker-compose -f ${COMPOSE_FILE} logs --tail=100 ${streamId}`, { encoding: 'utf8' });
+    return execFileSync('docker-compose', ['-f', COMPOSE_FILE, 'logs', '--tail=100', streamId], { encoding: 'utf8' });
   } catch (err: any) {
     return `Error fetching logs: ${err.message}`;
   }
