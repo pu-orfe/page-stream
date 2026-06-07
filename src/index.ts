@@ -500,7 +500,7 @@ export class PageStreamer {
     console.error('  • Confirm any firewalls / security groups allow UDP on the SRT port.');
     console.error('  • Check that the streamid or query params are correct for the target provider.');
     console.error('  • Test locally:');
-    console.error(`      ffmpeg -loglevel info -f mpegts -i "${ingest.replace(/"/g,'\\"')}" -f null -`);
+    console.error(`      ffmpeg -loglevel info -f mpegts -i "${ingest.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" -f null -`);
     console.error('  • Or run a local listener to validate output:');
     console.error('      ffmpeg -f mpegts -i "srt://:9000?mode=listener" -f null -');
     console.error('  • Increase verbosity with: --extra-ffmpeg -loglevel verbose');
@@ -512,7 +512,7 @@ export class PageStreamer {
     console.error('  • Verify the RTMP endpoint is reachable (TCP) and the stream key/path is correct.');
     console.error('  • Check for required application context (e.g. rtmp://host/app/KEY).');
     console.error('  • Validate with a simple publish test:');
-    console.error(`      ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i anullsrc -c:v libx264 -t 5 -f flv "${ingest.replace(/"/g,'\\"')}"`);
+    console.error(`      ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i anullsrc -c:v libx264 -t 5 -f flv "${ingest.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
     console.error('  • Some services require flv muxing: use --format flv');
     console.error('  • Increase verbosity with: --extra-ffmpeg -loglevel verbose');
   }
