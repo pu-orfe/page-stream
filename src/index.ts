@@ -35,6 +35,9 @@ interface StreamOptions {
   injectJs?: string; // path to JS file to inject into the page
   videoFile?: string; // path to video file for direct streaming (bypasses browser)
   videoLoop: boolean; // loop video file continuously
+  overlayLeft?: string; // path to image overlay in lower left corner
+  overlayRight?: string; // path to image overlay in lower right corner
+  citeText?: string; // citation text to overlay along bottom center
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,7 +120,10 @@ export class PageStreamer {
       this.persistentContext = await chromium.launchPersistentContext(this.userDataDir, {
         headless: this.opts.headless,
         args: commonArgs,
-        viewport: { width: this.opts.width, height: this.opts.height }
+        viewport: { width: this.opts.width, height: this.opts.height },
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
       });
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(this.persistentContext);
@@ -169,7 +175,13 @@ export class PageStreamer {
   const b = this.persistentContext.browser();
   if (b) this.browser = b;
     } else {
-      this.browser = await chromium.launch({ headless: this.opts.headless, args: commonArgs });
+      this.browser = await chromium.launch({
+        headless: this.opts.headless,
+        args: commonArgs,
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
+      });
       const ctx = await this.browser.newContext({ viewport: { width: this.opts.width, height: this.opts.height } });
       if (this.opts.suppressAutomationBanner) {
         await this.installAutomationBannerSuppression(ctx);
@@ -327,7 +339,7 @@ export class PageStreamer {
   }
 
   private buildVideoFileArgs(): string[] {
-    const { videoFile, videoLoop, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg, width, height } = this.opts;
+    const { videoFile, videoLoop, fps, ingest, preset, videoBitrate, audioBitrate, format, extraFfmpeg, width, height, overlayLeft, overlayRight, citeText } = this.opts;
     // Allow input-level tuning flags via environment variable
     const inputFlagsRaw = process.env.INPUT_FFMPEG_FLAGS || '';
     const inputFlags = inputFlagsRaw ? inputFlagsRaw.split(/\s+/).filter(Boolean) : [];
@@ -350,17 +362,47 @@ export class PageStreamer {
     // Use a filter to handle audio conditionally - simpler approach: always add null audio and map
     args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
 
-    // Build filter graph: scale video to target resolution, use original audio if present or fallback to null
-    const videoFilters: string[] = [];
+    // Build filter graph: scale video to target resolution and apply optional overlays/citation text
+    const hasOverlayLeft = overlayLeft && fs.existsSync(overlayLeft);
+    const hasOverlayRight = overlayRight && fs.existsSync(overlayRight);
 
-    // Scale to target resolution
-    videoFilters.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease`);
-    // Pad to exact target size (center the video if aspect ratio differs)
-    videoFilters.push(`pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`);
-    // Ensure consistent frame rate
-    videoFilters.push(`fps=${fps}`);
+    if (hasOverlayLeft || hasOverlayRight || citeText) {
+      let filterChain = `[in]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=${fps}[scaled]`;
+      let currentLabel = '[scaled]';
+      let count = 1;
 
-    args.push('-vf', videoFilters.join(','));
+      if (hasOverlayLeft) {
+        filterChain += `;movie=${overlayLeft},scale=-1:150[logo_l]`;
+        filterChain += `;${currentLabel}[logo_l]overlay=10:H-h-10[v${count}]`;
+        currentLabel = `[v${count}]`;
+        count++;
+      }
+
+      if (hasOverlayRight) {
+        filterChain += `;movie=${overlayRight},scale=-1:150[logo_r]`;
+        filterChain += `;${currentLabel}[logo_r]overlay=W-w-10:H-h-10[v${count}]`;
+        currentLabel = `[v${count}]`;
+        count++;
+      }
+
+      if (citeText) {
+        const escapedText = citeText.replace(/'/g, "'\\''");
+        const defaultFont = '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf';
+        const fontfileOption = fs.existsSync(defaultFont) ? `:fontfile=${defaultFont}` : '';
+        filterChain += `;${currentLabel}drawtext=text='${escapedText}'${fontfileOption}:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=5:x=(w-text_w)/2:y=h-text_h-20[v${count}]`;
+        currentLabel = `[v${count}]`;
+        count++;
+      }
+
+      filterChain += `;${currentLabel}null`;
+      args.push('-vf', filterChain);
+    } else {
+      const videoFilters: string[] = [];
+      videoFilters.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease`);
+      videoFilters.push(`pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`);
+      videoFilters.push(`fps=${fps}`);
+      args.push('-vf', videoFilters.join(','));
+    }
 
     // Encoding options
     args.push(
@@ -697,12 +739,18 @@ async function main() {
   .option('--auto-refresh-seconds <n>', 'Automatically refresh the page every N seconds (0=disable)', '0')
   .option('--video-file <path>', 'Stream video file directly (bypasses browser/Xvfb)')
   .option('--video-loop', 'Loop video file continuously (requires --video-file)', false)
+  .option('--overlay-left <path>', 'Path to image overlay in lower left corner')
+  .option('--overlay-right <path>', 'Path to image overlay in lower right corner')
+  .option('--cite-text <text>', 'Overlay citation text along the bottom center of the looping video')
     .parse(process.argv);
 
   const opts = program.opts();
   // CLI flags --inject-css/--inject-js may be omitted; allow environment fallback
   if (!opts.injectCss && process.env.INJECT_CSS) opts.injectCss = process.env.INJECT_CSS;
   if (!opts.injectJs && process.env.INJECT_JS) opts.injectJs = process.env.INJECT_JS;
+  if (!opts.overlayLeft && process.env.OVERLAY_LEFT) opts.overlayLeft = process.env.OVERLAY_LEFT;
+  if (!opts.overlayRight && process.env.OVERLAY_RIGHT) opts.overlayRight = process.env.OVERLAY_RIGHT;
+  if (!opts.citeText && process.env.CITE_TEXT) opts.citeText = process.env.CITE_TEXT;
   // Automatic display size fallback: If env WIDTH/HEIGHT (Xvfb) differ from requested capture size,
   // override the CLI width/height to prevent x11grab mismatch errors.
   const envW = process.env.WIDTH ? parseInt(process.env.WIDTH,10) : undefined;
@@ -743,6 +791,9 @@ async function main() {
     injectJs: opts.injectJs,
     videoFile: opts.videoFile,
     videoLoop: !!opts.videoLoop,
+    overlayLeft: opts.overlayLeft,
+    overlayRight: opts.overlayRight,
+    citeText: opts.citeText,
   });
 
 
