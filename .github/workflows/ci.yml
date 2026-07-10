@@ -21,7 +21,7 @@ jobs:
       # Ensure tests run in lightweight test mode and do not start heavy browsers/ffmpeg
       PAGE_STREAM_TEST_MODE: '1'
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-node@v6
       with:
         node-version: '20'
