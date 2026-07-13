@@ -21,7 +21,7 @@
     "@types/node": "^25.3.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "engines": {"node": ">=20"},
   "license": "MIT"
