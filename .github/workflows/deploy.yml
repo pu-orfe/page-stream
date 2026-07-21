@@ -1,0 +1,77 @@
+name: Deploy (GitOps)
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Build & Deploy Stack
+    # Runs on the self-hosted runner set up on the local machine
+    runs-on: [self-hosted, page-stream]
+    
+    steps:
+    # 1. Checkout repository and handle submodules
+    # If ORFE_SUBMODULE_SSH_KEY is set in secrets, actions/checkout uses it to fetch both
+    # the main repository and the private submodule.
+    # Otherwise, it falls back to a standard checkout and runs git submodule update
+    # using the runner user's local SSH agent configuration.
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        ssh-key: ${{ secrets.ORFE_SUBMODULE_SSH_KEY }}
+        submodules: ${{ secrets.ORFE_SUBMODULE_SSH_KEY != '' && 'recursive' || 'false' }}
+
+    - name: Initialize Submodules (fallback using host SSH configuration)
+      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY == '' }}
+      run: |
+        git submodule update --init --recursive
+
+    # 2. Reconstruct environment secrets
+    # If ENV_SECRETS_SH is provided as a single secret, write it directly.
+    # Otherwise, reconstruct it using individual variables.
+    - name: Configure Ingest Secrets
+      run: |
+        if [ -n "${{ secrets.ENV_SECRETS_SH }}" ]; then
+          echo "Writing .env.secrets.sh from ENV_SECRETS_SH repository secret..."
+          echo "${{ secrets.ENV_SECRETS_SH }}" > .env.secrets.sh
+        else
+          echo "Reconstructing .env.secrets.sh from individual repository secrets..."
+          cat << 'EOF' > .env.secrets.sh
+          #!/bin/bash
+          export STANDARD_1_INGEST='${{ secrets.STANDARD_1_INGEST }}'
+          export STANDARD_2_INGEST='${{ secrets.STANDARD_2_INGEST }}'
+          export STANDARD_3_INGEST='${{ secrets.STANDARD_3_INGEST }}'
+          export STANDARD_4_INGEST='${{ secrets.STANDARD_4_INGEST }}'
+          export STANDARD_5_INGEST='${{ secrets.STANDARD_5_INGEST }}'
+          export STANDARD_6_INGEST='${{ secrets.STANDARD_6_INGEST }}'
+          export COMPOSITOR_INGEST='${{ secrets.COMPOSITOR_INGEST }}'
+        EOF
+        fi
+        chmod +x .env.secrets.sh
+
+    # 3. Build & Deploy using Docker Compose
+    - name: Build and Restart Docker Compose Stack
+      run: |
+        COMPOSE_CMD="docker compose"
+        if command -v docker-compose &> /dev/null; then
+          COMPOSE_CMD="docker-compose"
+        fi
+        
+        echo "Using compose command: $COMPOSE_CMD"
+        
+        # Build images locally to incorporate latest code changes
+        $COMPOSE_CMD -f docker-compose.stable.yml build
+        
+        # Stop existing containers to ensure a clean release
+        $COMPOSE_CMD -f docker-compose.stable.yml down
+        
+        # Start the stack with the reconstructed secrets
+        source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d
+
+    # 4. Verify deployment health
+    - name: Verify Stack Health
+      run: |
+        sleep 10
+        docker ps
