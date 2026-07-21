@@ -9,7 +9,7 @@ jobs:
   deploy:
     name: Build & Deploy Stack
     # Runs on the self-hosted runner set up on the local machine
-    runs-on: [self-hosted, page-stream]
+    runs-on: [self-hosted, orfe]
     
     steps:
     # 1. Checkout repository and handle submodules
