@@ -1,9 +1,7 @@
 name: Deploy (GitOps)
 
 on:
-  push:
-    branches: ['main']
-  workflow_dispatch: {}
+  workflow_dispatch: {} # Manual dispatch only for GitOps deployment
 
 jobs:
   deploy:
@@ -12,7 +10,52 @@ jobs:
     runs-on: [self-hosted, orfe]
     
     steps:
-    # 1. Checkout repository and handle submodules
+    # 1. Pre-flight dependency check
+    - name: Verify Host Dependencies
+      run: |
+        echo "=== PRE-FLIGHT DEPENDENCY CHECK ==="
+        
+        # Check Git
+        if ! command -v git &> /dev/null; then
+          echo "::error::[PRE-FLIGHT FAILED] 'git' is not installed or not in the PATH on the runner host."
+          exit 1
+        fi
+        echo "✓ Git is installed."
+        
+        # Check Docker CLI
+        if ! command -v docker &> /dev/null; then
+          echo "::error::[PRE-FLIGHT FAILED] Docker CLI is not installed or not in the PATH on the runner host."
+          echo "Please install Docker on this host machine."
+          exit 1
+        fi
+        echo "✓ Docker CLI is installed."
+        
+        # Check if Docker daemon is running
+        if ! docker info &> /dev/null; then
+          echo "::error::[PRE-FLIGHT FAILED] Docker daemon is not running."
+          echo "Please start the Docker service or application (e.g., Docker Desktop) on the host machine."
+          exit 1
+        fi
+        echo "✓ Docker daemon is running."
+        
+        # Check Docker Compose (modern v2 command or legacy v1 script)
+        COMPOSE_FOUND=false
+        if docker compose version &> /dev/null; then
+          echo "✓ Found modern 'docker compose'."
+          COMPOSE_FOUND=true
+        elif command -v docker-compose &> /dev/null; then
+          echo "✓ Found legacy 'docker-compose'."
+          COMPOSE_FOUND=true
+        fi
+        
+        if [ "$COMPOSE_FOUND" = "false" ]; then
+          echo "::error::[PRE-FLIGHT FAILED] Neither 'docker compose' nor 'docker-compose' was found on the runner host."
+          echo "Please install Docker Compose on the host machine."
+          exit 1
+        fi
+        echo "==================================="
+
+    # 2. Checkout repository and handle submodules
     # If ORFE_SUBMODULE_SSH_KEY is set in secrets, actions/checkout uses it to fetch both
     # the main repository and the private submodule.
     # Otherwise, it falls back to a standard checkout and runs git submodule update
@@ -28,7 +71,7 @@ jobs:
       run: |
         git submodule update --init --recursive
 
-    # 2. Reconstruct environment secrets
+    # 3. Reconstruct environment secrets
     # If ENV_SECRETS_SH is provided as a single secret, write it directly.
     # Otherwise, reconstruct it using individual variables.
     - name: Configure Ingest Secrets
@@ -51,8 +94,8 @@ jobs:
         fi
         chmod +x .env.secrets.sh
 
-    # 3. Build & Deploy using Docker Compose
-    - name: Build and Restart Docker Compose Stack
+    # 4. Build & Deploy using Docker Compose (Idempotent updates in-place)
+    - name: Build and Update Docker Compose Stack
       run: |
         COMPOSE_CMD="docker compose"
         if command -v docker-compose &> /dev/null; then
@@ -61,17 +104,32 @@ jobs:
         
         echo "Using compose command: $COMPOSE_CMD"
         
-        # Build images locally to incorporate latest code changes
-        $COMPOSE_CMD -f docker-compose.stable.yml build
-        
-        # Stop existing containers to ensure a clean release
-        $COMPOSE_CMD -f docker-compose.stable.yml down
-        
-        # Start the stack with the reconstructed secrets
-        source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d
+        # Idempotently update, build, and restart modified services with zero/minimal downtime.
+        # This prevents stopping and starting everything cleanly (which causes needless outages on unaffected streams).
+        source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d --build --remove-orphans
 
-    # 4. Verify deployment health
+    # 5. Verify deployment health
     - name: Verify Stack Health
       run: |
+        echo "Waiting 10 seconds for services to stabilize..."
         sleep 10
-        docker ps
+        
+        COMPOSE_CMD="docker compose"
+        if command -v docker-compose &> /dev/null; then
+          COMPOSE_CMD="docker-compose"
+        fi
+        
+        echo "=== Container Status ==="
+        $COMPOSE_CMD -f docker-compose.stable.yml ps
+        
+        # Look for any container that is exited, dead, or restarting
+        # Filter containers belonging to the project and check status
+        CONTAINERS_NOT_RUNNING=$(docker ps -a --filter "label=com.docker.compose.project=page-stream" --filter "status=exited" --filter "status=dead" --filter "status=restarting" -q)
+        
+        if [ -n "$CONTAINERS_NOT_RUNNING" ]; then
+          echo "::error::[DEPLOYMENT UNHEALTHY] One or more Docker containers are not running successfully!"
+          echo "Logs of failing/stopped containers:"
+          docker ps -a --filter "label=com.docker.compose.project=page-stream"
+          exit 1
+        fi
+        echo "All stack containers are successfully running."
