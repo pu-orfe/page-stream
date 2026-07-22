@@ -61,8 +61,9 @@ echo -e "  ${BOLD}1)${NC} Check Runner Status"
 echo -e "  ${BOLD}2)${NC} Restart Runner Daemon"
 echo -e "  ${BOLD}3)${NC} Stop Runner Daemon"
 echo -e "  ${BOLD}4)${NC} Teardown Local Container Stack (Clean slate)"
-echo -e "  ${BOLD}5)${NC} Exit"
-read -rp "Select an option [1-5]: " OPTION
+echo -e "  ${BOLD}5)${NC} Bootstrap a New Private Ops Repository (Other Units/Departments)"
+echo -e "  ${BOLD}6)${NC} Exit"
+read -rp "Select an option [1-6]: " OPTION
 
 case $OPTION in
     1)
@@ -89,6 +90,197 @@ case $OPTION in
         echo -e "\n${RED}${BOLD}Tearing down container stack...${NC}"
         docker compose -f docker-compose.stable.yml down --remove-orphans || true
         echo -e "${GREEN}✓ All page-stream containers stopped and removed.${NC}"
+        ;;
+    5)
+        echo -e "\n${BLUE}${BOLD}======================================================================${NC}"
+        echo -e "${CYAN}${BOLD}             BOOTSTRAPPING A NEW DEPARTMENT OPS REPOSITORY            ${NC}"
+        echo -e "${BLUE}${BOLD}======================================================================${NC}"
+        
+        # Check gh auth status
+        if ! gh auth status &> /dev/null; then
+            echo -e "${RED}✗ Error: You must be logged into the 'gh' CLI first. Run 'gh auth login'.${NC}"
+            exit 1
+        fi
+        
+        read -rp "Enter your Department Code (lowercase, e.g., 'economics', 'cs'): " DEPT
+        DEPT=$(echo "$DEPT" | tr '[:upper:]' '[:lower:]' | xargs)
+        
+        if [ -z "$DEPT" ]; then
+            echo -e "${RED}✗ Error: Department code cannot be empty.${NC}"
+            exit 1
+        fi
+        
+        TARGET_DIR="page-stream-config-${DEPT}"
+        echo -e "\nCreating local folder structure under: ${CYAN}${TARGET_DIR}/${NC}"
+        
+        mkdir -p "${TARGET_DIR}/.github/workflows"
+        mkdir -p "${TARGET_DIR}/${DEPT}/assets"
+        
+        # 1. Create docker-compose.yml template
+        cat <<EOF > "${TARGET_DIR}/${DEPT}/docker-compose.yml"
+services:
+  requirements-check:
+    image: alpine:latest
+    container_name: requirements-check-${DEPT}
+    volumes:
+      - ../page-stream-src/scripts:/scripts:ro
+    entrypoint: ["sh", "-c"]
+    command: ["/scripts/check-system-requirements.sh"]
+    restart: "no"
+
+  standard-1:
+    image: page-stream:latest
+    container_name: standard-1-${DEPT}
+    volumes:
+      - ../page-stream-src/demo:/app/demo:ro
+      - ../page-stream-src/demo:/out/demo:ro
+    environment:
+      - WIDTH=1920
+      - HEIGHT=1080
+      - DISPLAY=:101
+      - INJECT_CSS=/out/demo/assets/custom.css
+    depends_on:
+      requirements-check:
+        condition: service_completed_successfully
+    command:
+      - "--ingest"
+      - "\${STANDARD_1_INGEST}"
+      - "--url"
+      - "\${STANDARD_1_URL}"
+      - "--auto-refresh-seconds"
+      - "3600"
+      - "--crop-infobar"
+      - "64"
+    restart: unless-stopped
+EOF
+
+        # 2. Create custom.css and custom.js templates
+        cat <<EOF > "${TARGET_DIR}/${DEPT}/assets/custom.css"
+/* Custom CSS styling for ${DEPT} public displays */
+body {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+EOF
+        cat <<EOF > "${TARGET_DIR}/${DEPT}/assets/custom.js"
+/* Custom JavaScript execution for ${DEPT} public displays */
+console.log("[${DEPT}-inject] custom.js loaded");
+EOF
+
+        # 3. Create target configuration env file
+        cat <<EOF > "${TARGET_DIR}/${DEPT}/${DEPT}.env"
+# ${DEPT} public display website targets (safe to check in)
+STANDARD_1_URL=https://example.com/${DEPT}-slideshow
+EOF
+
+        # 4. Create deploy workflow pipeline template
+        cat <<EOF > "${TARGET_DIR}/.github/workflows/deploy.yml"
+name: Deploy (GitOps)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy Stack (${DEPT})
+    runs-on:
+      - self-hosted
+      - ${DEPT}
+    
+    steps:
+    - name: Verify Host Dependencies
+      run: |
+        for cmd in git docker; do
+          command -v \$cmd &> /dev/null || { echo "::error::\$cmd missing"; exit 1; }
+        done
+
+    - name: Checkout Private Configuration
+      uses: actions/checkout@v4
+
+    - name: Clone Public Codebase
+      run: |
+        rm -rf page-stream-src
+        git clone https://github.com/pu-orfe/page-stream.git page-stream-src
+
+    - name: Configure Ingest Secrets
+      run: |
+        echo '#!/bin/bash' > ${DEPT}/.env.secrets.sh
+        echo "export STANDARD_1_INGEST='\${{ secrets.STANDARD_1_INGEST }}'" >> ${DEPT}/.env.secrets.sh
+        chmod +x ${DEPT}/.env.secrets.sh
+
+    - name: Build and Update Docker Compose Stack
+      working-directory: ${DEPT}
+      run: |
+        export \$(grep -v '^#' ${DEPT}.env | xargs)
+        source .env.secrets.sh && docker compose up -d --build --remove-orphans
+
+    - name: Verify Stack Health
+      working-directory: ${DEPT}
+      run: |
+        sleep 25
+        docker ps
+        UNHEALTHY=\$(docker ps -a --filter "label=com.docker.compose.project=${DEPT}" --filter "status=exited" --format "{{.Names}}" | grep -v "requirements-check" || true)
+        if [ -n "\$UNHEALTHY" ]; then
+          echo "::error::[DEPLOYMENT UNHEALTHY] Containers failed to start!"
+          exit 1
+        fi
+EOF
+
+        # 5. Create a local README
+        cat <<EOF > "${TARGET_DIR}/README.md"
+# ${DEPT} Page Stream Configuration
+
+This private repository securely hosts the deployment configuration for ${DEPT}'s public displays.
+
+## 🚀 Getting Started
+
+1. Set up your Kaltura/Ingest stream credentials as standard **GitHub Repository Secrets** in this repository:
+   * \`STANDARD_1_INGEST\`
+2. Configure your target website URL inside \`${DEPT}/${DEPT}.env\`.
+3. Set up a self-hosted runner on your local display machine and register it for this repository.
+4. Run the workflow under **Actions** -> **Deploy (GitOps)** to start the stream!
+EOF
+
+        echo -e "${GREEN}✓ Local templates generated successfully inside: ${TARGET_DIR}/${NC}"
+        
+        # Ask to create GitHub repository
+        read -rp "Would you like to automatically create a private GitHub repository for this on your account? [y/N]: " PUSH_REPO
+        if [[ "$PUSH_REPO" =~ ^[Yy]$ ]]; then
+            read -rp "Enter GitHub Owner/Organization (default: pu-orfe): " OWNER
+            OWNER=${OWNER:-pu-orfe}
+            REPO_NAME="${OWNER}/${TARGET_DIR}"
+            
+            echo -e "\nCreating private GitHub repository ${CYAN}${REPO_NAME}${NC}..."
+            if gh repo create "$REPO_NAME" --private --confirm &> /dev/null; then
+                echo -e "${GREEN}✓ GitHub Repository created successfully!${NC}"
+                
+                # Push local code
+                echo "Initializing Git and pushing templates..."
+                cd "$TARGET_DIR"
+                git init -b main &> /dev/null
+                git add -A
+                git commit -m "Initialize ${DEPT} Ops repository templates" &> /dev/null
+                git remote add origin "https://github.com/${REPO_NAME}.git"
+                if git push -u origin main &> /dev/null; then
+                    echo -e "${GREEN}✓ Templates successfully pushed to https://github.com/${REPO_NAME}${NC}"
+                else
+                    echo -e "${YELLOW}⚠ Failed to push templates automatically. Please CD into '${TARGET_DIR}' and run 'git push' manually.${NC}"
+                fi
+                cd ..
+            else
+                echo -e "${RED}✗ Failed to create GitHub Repository automatically. Please make sure your token has repo-creation permissions.${NC}"
+            fi
+        fi
+        
+        echo -e "\n${GREEN}${BOLD}======================================================================${NC}"
+        echo -e "${CYAN}${BOLD}             BOOTSTRAP COMPLETION SUCCESSFUL!                        ${NC}"
+        echo -e "${GREEN}${BOLD}======================================================================${NC}"
+        echo -e "Next steps for the new unit:"
+        echo -e "  1. CD into: ${CYAN}${TARGET_DIR}/${NC}"
+        echo -e "  2. Edit target URLs in: ${CYAN}${DEPT}/${DEPT}.env${NC}"
+        echo -e "  3. Configure GitHub Secret: ${CYAN}STANDARD_1_INGEST${NC}"
+        echo -e "  4. Register self-hosted runner for the new repo, and trigger the Deploy Action!"
         ;;
     *)
         echo -e "\nExiting."

@@ -26,6 +26,43 @@ For production environments, `page-stream` recommends **Pattern 1 (Ops Repositor
 
 ---
 
+## 🏛 Quick Start for Other University Units/Departments
+
+If you are a different academic department, administrative unit, or student organization (e.g., `economics`, `cs`, `athletics`) and would like to deploy your own high-fidelity public display streams, you don't need to write any configuration or orchestrations from scratch! 
+
+We have built a fully automated, interactive bootstrapping wizard right into the repository. 
+
+### **The 4-Step Bootstrap Guide:**
+
+#### **Step 1: Clone the Core Codebase**
+Clone the public streaming engine on your display runner machine:
+```bash
+git clone https://github.com/pu-orfe/page-stream.git
+cd page-stream
+```
+
+#### **Step 2: Run the Bootstrapper**
+Launch the interactive helper script:
+```bash
+./bootstrap-runner.sh
+```
+Choose **`Option 5) Bootstrap a New Private Ops Repository`**.
+
+#### **Step 3: Answer the Prompts**
+The wizard will guide you through:
+1. Entering your department code (e.g., `economics`).
+2. Generating a local, custom, structured configuration repository folder containing templates for your `docker-compose.yml`, website target mapping `economics.env`, and visual assets (`assets/custom.css`).
+3. Automatically logging into GitHub and creating a brand new **private, secure configuration repository** on your account (e.g., `pu-orfe/page-stream-config-economics`) using your authenticated `gh` session.
+4. Auto-committing and pushing your new templates to GitHub!
+
+#### **Step 4: Configure & Launch**
+Once completed, follow the printed completion instructions:
+1. Add your private Kaltura ingest URLs to your new repository's **GitHub Secrets** (as `STANDARD_1_INGEST`).
+2. Add your target website URLs to your new config file (e.g., `economics/economics.env`).
+3. Register your self-hosted runner for your new private repository, and trigger the **Deploy Action**!
+
+---
+
 ## 🛠 Local Administration Utilities
 
 We have added two high-fidelity helper utilities to the public repository root to streamline local runner administration:
