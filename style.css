@@ -237,4 +237,97 @@ td { color: #475569; }
   .pipeline-arrow { transform: rotate(90deg); padding: 0.5rem 0; }
   .feature-grid { grid-template-columns: 1fr; }
   .arch-cols { grid-template-columns: 1fr; }
+  .simplified-guide { grid-template-columns: 1fr !important; }
 }
+
+/* Simplified Quick Start Guide Styles */
+.section-subtitle {
+  max-width: 720px;
+  color: #475569;
+  font-size: 1rem;
+  margin-top: -1rem;
+  margin-bottom: 2.5rem;
+}
+.simplified-guide {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+.terminal-card {
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+  border: 1px solid #1e293b;
+}
+.terminal-header {
+  background: #1e293b;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid #0f172a;
+}
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.terminal-dot.red { background: #ef4444; }
+.terminal-dot.yellow { background: #f59e0b; }
+.terminal-dot.green { background: #10b981; }
+.terminal-title {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-family: monospace;
+  margin-left: 0.5rem;
+}
+.terminal-body {
+  padding: 1.25rem;
+}
+.terminal-body pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.comment {
+  color: #64748b;
+  font-style: italic;
+}
+.guide-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.guide-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 1.25rem;
+  border-radius: 8px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.guide-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+}
+.guide-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+.guide-card h3 {
+  font-size: 1rem;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+.guide-card p {
+  font-size: 0.85rem;
+  color: #475569;
+  line-height: 1.5;
+}
+

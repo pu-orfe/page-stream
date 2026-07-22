@@ -111,43 +111,43 @@
   <section id="quickstart" class="section">
     <div class="container">
       <h2>Quick Start</h2>
-      <div class="steps">
-        <div class="step">
-          <h3>1. Configure URLs</h3>
-          <pre><code>cp .env.stable.example .env
-# Edit .env with your target URLs:
-#   STANDARD_1_URL, STANDARD_2_URL, ...
-#   SOURCE_LEFT_URL, SOURCE_RIGHT_URL</code></pre>
-        </div>
-        <div class="step">
-          <h3>2. Configure Secrets (Production)</h3>
-          <p>If your ingest URLs contain <code>#</code> characters (e.g. Kaltura stream IDs):</p>
-          <pre><code>cp env.secrets.sh.example .env.secrets.sh
-# Edit .env.secrets.sh with your actual stream IDs</code></pre>
-        </div>
-        <div class="step">
-          <h3>3. Build &amp; Start</h3>
-          <pre><code>docker build -t page-stream:latest .
+      <p class="section-subtitle">Deploying high-fidelity streaming nodes on your local screens has never been simpler. Avoid manual environment configurations and complex compose syntax by utilizing our friendly, automated host utility.</p>
+      
+      <div class="simplified-guide">
+        <div class="terminal-card">
+          <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">bash</span>
+          </div>
+          <div class="terminal-body">
+            <pre><code><span class="comment"># 1. Clone the core streaming engine</span>
+git clone https://github.com/pu-orfe/page-stream.git
+cd page-stream
 
-# With production secrets:
-source .env.secrets.sh && \
-  docker-compose -f docker-compose.stable.yml up -d
-
-# Or for local testing:
-docker-compose -f docker-compose.stable.yml up -d</code></pre>
-          <p>Streams appear in the <code>out/</code> folder &mdash; open with VLC or <code>ffplay</code>.</p>
+<span class="comment"># 2. Run the interactive bootstrapper</span>
+./bootstrap-runner.sh</code></pre>
+          </div>
         </div>
-      </div>
-      <div class="requirements-box">
-        <h3>Minimum Requirements</h3>
-        <ul>
-          <li>Docker</li>
-          <li>6 CPU cores</li>
-          <li>16 GB RAM</li>
-        </ul>
-        <p>An automatic check validates resources at startup. For macOS with Colima:</p>
-        <pre><code>colima stop
-colima start --cpu 8 --memory 16</code></pre>
+
+        <div class="guide-cards">
+          <div class="guide-card">
+            <div class="guide-icon">🛡</div>
+            <h3>Resource Auditing</h3>
+            <p>The bootstrapper automatically scans your host machine's physical CPUs, memory, and Colima allocations to ensure optimal, stutter-free video encodes.</p>
+          </div>
+          <div class="guide-card">
+            <div class="guide-icon">⚙</div>
+            <h3>Daemon Management</h3>
+            <p>Check active self-hosted runner process statuses, launch listeners in the background, or stop daemons without writing low-level shell commands.</p>
+          </div>
+          <div class="guide-card">
+            <div class="guide-icon">🏛</div>
+            <h3>Department Templater</h3>
+            <p>Other campus units can instantly generate private Ops Repositories matching their own codes (e.g., CS, Economics), link it to private credentials, and launch custom display layouts automatically.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
