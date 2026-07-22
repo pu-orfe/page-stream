@@ -1,7 +1,6 @@
 name: Deploy (GitOps)
 
-# Quote 'on' to avoid YAML parser casting it to boolean True
-'on':
+on:
   workflow_dispatch:
     inputs:
       recreate_from_scratch:
@@ -13,8 +12,10 @@ name: Deploy (GitOps)
 jobs:
   deploy:
     name: Build & Deploy Stack
-    # Runs on the self-hosted runner set up on the local machine
-    runs-on: [self-hosted, orfe]
+    # Explicitly list the runner tags as standard YAML sequence elements
+    runs-on:
+      - self-hosted
+      - orfe
     
     steps:
     # 1. Pre-flight dependency check
@@ -63,20 +64,20 @@ jobs:
         echo "==================================="
 
     # 2. Checkout repository and handle submodules
-    # We use separate steps for with and without SSH key to avoid complex inline expressions.
+    # We remove the ${{ }} wrapper around 'if' conditions, which is standard GitHub Actions syntax
     - name: Checkout Repository (with Submodules via SSH Key)
-      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY != '' }}
+      if: secrets.ORFE_SUBMODULE_SSH_KEY != ''
       uses: actions/checkout@v4
       with:
         ssh-key: ${{ secrets.ORFE_SUBMODULE_SSH_KEY }}
         submodules: recursive
 
     - name: Checkout Repository (Standard)
-      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY == '' }}
+      if: secrets.ORFE_SUBMODULE_SSH_KEY == ''
       uses: actions/checkout@v4
 
     - name: Initialize Submodules (fallback using host SSH configuration)
-      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY == '' }}
+      if: secrets.ORFE_SUBMODULE_SSH_KEY == ''
       run: |
         git submodule update --init --recursive
 
