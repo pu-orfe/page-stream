@@ -84,26 +84,44 @@ jobs:
       run: |
         git -c url.https://github.com/.insteadOf=git@github.com: submodule update --init --recursive
 
-    # 3. Reconstruct environment secrets
-    # If ENV_SECRETS_SH is provided as a single secret, write it directly.
-    # Otherwise, reconstruct it using individual variables.
-    - name: Configure Ingest Secrets
+    # 3. Reconstruct environment secrets & copy local overrides
+    # Since the runner operates on your local host, we copy your active host .env and .env.secrets.sh configs (ignored by git)
+    # directly into the runner's workspace to ensure 100% parity with your working local setup.
+    - name: Configure Ingest Secrets & Environment Overrides
       run: |
-        if [ -n "${{ secrets.ENV_SECRETS_SH }}" ]; then
-          echo "Writing .env.secrets.sh from ENV_SECRETS_SH repository secret..."
-          echo "${{ secrets.ENV_SECRETS_SH }}" > .env.secrets.sh
+        echo "=== RECONSTRUCTING ENVIRONMENT ==="
+        
+        # 1. Copy the active .env file from your primary host project folder
+        if [ -f "/Users/publicdisplays/Downloads/page-stream/.env" ]; then
+          echo "✓ Copying live .env file from host to runner workspace"
+          cp "/Users/publicdisplays/Downloads/page-stream/.env" .env
         else
-          echo "Reconstructing .env.secrets.sh from individual repository secrets..."
-          echo '#!/bin/bash' > .env.secrets.sh
-          echo "export STANDARD_1_INGEST='${{ secrets.STANDARD_1_INGEST }}'" >> .env.secrets.sh
-          echo "export STANDARD_2_INGEST='${{ secrets.STANDARD_2_INGEST }}'" >> .env.secrets.sh
-          echo "export STANDARD_3_INGEST='${{ secrets.STANDARD_3_INGEST }}'" >> .env.secrets.sh
-          echo "export STANDARD_4_INGEST='${{ secrets.STANDARD_4_INGEST }}'" >> .env.secrets.sh
-          echo "export STANDARD_5_INGEST='${{ secrets.STANDARD_5_INGEST }}'" >> .env.secrets.sh
-          echo "export STANDARD_6_INGEST='${{ secrets.STANDARD_6_INGEST }}'" >> .env.secrets.sh
-          echo "export COMPOSITOR_INGEST='${{ secrets.COMPOSITOR_INGEST }}'" >> .env.secrets.sh
+          echo "⚠ No host .env found, using defaults"
+        fi
+        
+        # 2. Copy the active secrets from your primary host project folder
+        if [ -f "/Users/publicdisplays/Downloads/page-stream/.env.secrets.sh" ]; then
+          echo "✓ Copying live .env.secrets.sh file from host to runner workspace"
+          cp "/Users/publicdisplays/Downloads/page-stream/.env.secrets.sh" .env.secrets.sh
+        else
+          echo "⚠ No host .env.secrets.sh found, falling back to GitHub secrets..."
+          if [ -n "${{ secrets.ENV_SECRETS_SH }}" ]; then
+            echo "Writing .env.secrets.sh from ENV_SECRETS_SH repository secret..."
+            echo "${{ secrets.ENV_SECRETS_SH }}" > .env.secrets.sh
+          else
+            echo "Reconstructing .env.secrets.sh from individual repository secrets..."
+            echo '#!/bin/bash' > .env.secrets.sh
+            echo "export STANDARD_1_INGEST='${{ secrets.STANDARD_1_INGEST }}'" >> .env.secrets.sh
+            echo "export STANDARD_2_INGEST='${{ secrets.STANDARD_2_INGEST }}'" >> .env.secrets.sh
+            echo "export STANDARD_3_INGEST='${{ secrets.STANDARD_3_INGEST }}'" >> .env.secrets.sh
+            echo "export STANDARD_4_INGEST='${{ secrets.STANDARD_4_INGEST }}'" >> .env.secrets.sh
+            echo "export STANDARD_5_INGEST='${{ secrets.STANDARD_5_INGEST }}'" >> .env.secrets.sh
+            echo "export STANDARD_6_INGEST='${{ secrets.STANDARD_6_INGEST }}'" >> .env.secrets.sh
+            echo "export COMPOSITOR_INGEST='${{ secrets.COMPOSITOR_INGEST }}'" >> .env.secrets.sh
+          fi
         fi
         chmod +x .env.secrets.sh
+        echo "==================================="
 
     # 4. Build & Deploy using Docker Compose (Idempotent updates or forced recreation)
     - name: Build and Update Docker Compose Stack
@@ -131,8 +149,8 @@ jobs:
     # 5. Verify deployment health
     - name: Verify Stack Health
       run: |
-        echo "Waiting 15 seconds for services to stabilize..."
-        sleep 15
+        echo "Waiting 25 seconds for services to stabilize (allows Chrome & FFmpeg to boot)..."
+        sleep 25
         
         COMPOSE_CMD="docker compose"
         if command -v docker-compose &> /dev/null; then
