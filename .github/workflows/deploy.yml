@@ -131,8 +131,8 @@ jobs:
     # 5. Verify deployment health
     - name: Verify Stack Health
       run: |
-        echo "Waiting 10 seconds for services to stabilize..."
-        sleep 10
+        echo "Waiting 15 seconds for services to stabilize..."
+        sleep 15
         
         COMPOSE_CMD="docker compose"
         if command -v docker-compose &> /dev/null; then
@@ -142,9 +142,9 @@ jobs:
         echo "=== Container Status ==="
         $COMPOSE_CMD -f docker-compose.stable.yml ps
         
-        # Look for any container that is exited, dead, or restarting
         # Filter containers belonging to the project and check status
-        CONTAINERS_NOT_RUNNING=$(docker ps -a --filter "label=com.docker.compose.project=page-stream" --filter "status=exited" --filter "status=dead" --filter "status=restarting" -q)
+        # We exclude 'requirements-check' from the list of failed/stopped containers because it's a one-shot container designed to exit(0)
+        CONTAINERS_NOT_RUNNING=$(docker ps -a --filter "label=com.docker.compose.project=page-stream" --filter "status=exited" --filter "status=dead" --filter "status=restarting" --format "{{.Names}}" | grep -v "requirements-check" || true)
         
         if [ -n "$CONTAINERS_NOT_RUNNING" ]; then
           echo "::error::[DEPLOYMENT UNHEALTHY] One or more Docker containers are not running successfully!"
