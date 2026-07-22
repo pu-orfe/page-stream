@@ -78,7 +78,13 @@ jobs:
       if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       uses: actions/checkout@v4
 
-    - name: Initialize Submodules (fallback using host SSH configuration)
+    # Local-only git URL translation so it is strictly scoped to this runner build job
+    - name: Configure Submodules to use HTTPS locally
+      if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
+      run: |
+        git config url."https://github.com/".insteadOf "git@github.com:"
+
+    - name: Initialize Submodules (fallback using HTTPS)
       if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       run: |
         git submodule update --init --recursive
