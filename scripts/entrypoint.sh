@@ -1,9 +1,19 @@
-#!/usr/bin/env bash
+#!/bin/env bash
 set -euo pipefail
 
 if [[ "${DEBUG:-}" != "" ]]; then
   set -x
 fi
+
+# Unified background process cleanup
+cleanup_pids=()
+cleanup() {
+  echo "[entrypoint] Cleaning up background processes..." >&2
+  for pid in "${cleanup_pids[@]}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+}
+trap cleanup EXIT
 
 if [[ $# -eq 0 ]]; then
   echo "Usage: page-stream --ingest <SRT/RTMP URI> [--url <page>] [options...]"
@@ -50,8 +60,7 @@ else
     XVFB_H=${HEIGHT:-720}
     XVFB_D=${DISPLAY:-:99}
     Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
-    XVFB_PID=$!
-    trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
+    XVFB_PID=$!; cleanup_pids+=("$XVFB_PID")
 
     # Wait for Xvfb to be ready before continuing
     echo "[entrypoint] Waiting for Xvfb display $XVFB_D to be ready..." >&2
@@ -78,17 +87,14 @@ if [[ "${ENABLE_NOVNC:-0}" == "1" ]]; then
   if [[ "$LIGHT_NOVNC" == "1" ]]; then
     # Lightweight fallback server (HTTP only) for host-based tests without websockify/x11vnc
     node -e 'require("http").createServer((req,res)=>{res.writeHead(200,{"Content-Type":"text/plain"});res.end("noVNC test placeholder\n");}).listen(6080,"127.0.0.1",()=>console.error("[noVNC] fallback HTTP started (lightweight)"));' &
-    FALLBACK_PID=$!
-    trap 'kill $FALLBACK_PID 2>/dev/null || true' EXIT
+    FALLBACK_PID=$!; cleanup_pids+=("$FALLBACK_PID")
   else
     # Start x11vnc and websockify if available
     x11vnc -display ${XVFB_D:-:99} -nopw -forever -shared -rfbport 5900 -localhost &
-    X11VNC_PID=$!
-    trap 'kill $X11VNC_PID 2>/dev/null || true' EXIT
+    X11VNC_PID=$!; cleanup_pids+=("$X11VNC_PID")
     if command -v websockify >/dev/null 2>&1; then
       websockify --web /usr/share/novnc/ 6080 localhost:5900 &
-      WEBSOCKIFY_PID=$!
-      trap 'kill $WEBSOCKIFY_PID 2>/dev/null || true' EXIT
+      WEBSOCKIFY_PID=$!; cleanup_pids+=("$WEBSOCKIFY_PID")
       # Provide a redirecting index that auto-connects using empty path (some noVNC versions default to /websockify which 404s in our setup)
       cat > /usr/share/novnc/index.html <<'REDIR'
 <!doctype html><html><head><meta charset="utf-8"><title>noVNC Redirect</title></head><body>
@@ -105,8 +111,7 @@ REDIR
     else
       echo "[noVNC] WARNING: websockify not found, using lightweight fallback"
       node -e 'require("http").createServer((req,res)=>{res.writeHead(200,{"Content-Type":"text/plain"});res.end("noVNC fallback (no websockify)\n");}).listen(6080,"127.0.0.1",()=>console.error("[noVNC] fallback HTTP started"));' &
-      FALLBACK_PID=$!
-      trap 'kill $FALLBACK_PID 2>/dev/null || true' EXIT
+      FALLBACK_PID=$!; cleanup_pids+=("$FALLBACK_PID")
     fi
   fi
   # Readiness probe (works for both real and fallback)
@@ -207,6 +212,36 @@ fi
 node dist/index.js "$@" &
 APP_PID=$!
 
+# Optional Healthchecks.io support
+if [[ -n "${HEALTHCHECKS_IO_URL:-}" ]]; then
+  echo "[entrypoint] Healthchecks.io URL detected. Starting background ping daemon..." >&2
+  (
+    # Wait for the main process to warm up
+    sleep 10
+    interval=${HEALTHCHECKS_IO_INTERVAL_SECONDS:-60}
+    while kill -0 "$APP_PID" 2>/dev/null; do
+      if command -v curl &>/dev/null; then
+        curl -s -m 10 -o /dev/null --retry 3 "${HEALTHCHECKS_IO_URL}" || true
+      elif command -v wget &>/dev/null; then
+        wget -q -T 10 -O /dev/null --tries=3 "${HEALTHCHECKS_IO_URL}" || true
+      fi
+      sleep "$interval"
+    done
+    
+    # If we reached here, APP_PID exited. Check exit status.
+    wait "$APP_PID" && exit_status=$? || exit_status=$?
+    if [[ $exit_status -ne 0 ]]; then
+      echo "[healthchecks] Main process exited with status $exit_status. Sending failure signal to healthchecks.io..." >&2
+      if command -v curl &>/dev/null; then
+        curl -s -m 10 -o /dev/null --retry 3 "${HEALTHCHECKS_IO_URL}/fail" || true
+      elif command -v wget &>/dev/null; then
+        wget -q -T 10 -O /dev/null --tries=3 "${HEALTHCHECKS_IO_URL}/fail" || true
+      fi
+    fi
+  ) &
+  HC_PING_PID=$!; cleanup_pids+=("$HC_PING_PID")
+fi
+
 # Relay HUP to refresh
 while true; do
   if read line < "$REFRESH_FIFO"; then
@@ -214,8 +249,7 @@ while true; do
     kill -HUP "$APP_PID" || true
   fi
 done &
-FIFO_LOOP_PID=$!
-trap 'kill $FIFO_LOOP_PID 2>/dev/null || true' EXIT
+FIFO_LOOP_PID=$!; cleanup_pids+=("$FIFO_LOOP_PID")
 
 # When container receives HUP -> refresh
 trap 'echo "Container caught HUP -> refreshing"; kill -HUP $APP_PID' HUP
