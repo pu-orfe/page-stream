@@ -1,6 +1,7 @@
 name: Deploy (GitOps)
 
-on:
+# Quote 'on' to avoid YAML parser casting it to boolean True
+'on':
   workflow_dispatch:
     inputs:
       recreate_from_scratch:
@@ -62,15 +63,17 @@ jobs:
         echo "==================================="
 
     # 2. Checkout repository and handle submodules
-    # If ORFE_SUBMODULE_SSH_KEY is set in secrets, actions/checkout uses it to fetch both
-    # the main repository and the private submodule.
-    # Otherwise, it falls back to a standard checkout and runs git submodule update
-    # using the runner user's local SSH agent configuration.
-    - name: Checkout Repository
+    # We use separate steps for with and without SSH key to avoid complex inline expressions.
+    - name: Checkout Repository (with Submodules via SSH Key)
+      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY != '' }}
       uses: actions/checkout@v4
       with:
         ssh-key: ${{ secrets.ORFE_SUBMODULE_SSH_KEY }}
-        submodules: ${{ secrets.ORFE_SUBMODULE_SSH_KEY != '' && 'recursive' || 'false' }}
+        submodules: recursive
+
+    - name: Checkout Repository (Standard)
+      if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY == '' }}
+      uses: actions/checkout@v4
 
     - name: Initialize Submodules (fallback using host SSH configuration)
       if: ${{ secrets.ORFE_SUBMODULE_SSH_KEY == '' }}
@@ -87,16 +90,14 @@ jobs:
           echo "${{ secrets.ENV_SECRETS_SH }}" > .env.secrets.sh
         else
           echo "Reconstructing .env.secrets.sh from individual repository secrets..."
-          cat << 'EOF' > .env.secrets.sh
-          #!/bin/bash
-          export STANDARD_1_INGEST='${{ secrets.STANDARD_1_INGEST }}'
-          export STANDARD_2_INGEST='${{ secrets.STANDARD_2_INGEST }}'
-          export STANDARD_3_INGEST='${{ secrets.STANDARD_3_INGEST }}'
-          export STANDARD_4_INGEST='${{ secrets.STANDARD_4_INGEST }}'
-          export STANDARD_5_INGEST='${{ secrets.STANDARD_5_INGEST }}'
-          export STANDARD_6_INGEST='${{ secrets.STANDARD_6_INGEST }}'
-          export COMPOSITOR_INGEST='${{ secrets.COMPOSITOR_INGEST }}'
-        EOF
+          echo '#!/bin/bash' > .env.secrets.sh
+          echo "export STANDARD_1_INGEST='${{ secrets.STANDARD_1_INGEST }}'" >> .env.secrets.sh
+          echo "export STANDARD_2_INGEST='${{ secrets.STANDARD_2_INGEST }}'" >> .env.secrets.sh
+          echo "export STANDARD_3_INGEST='${{ secrets.STANDARD_3_INGEST }}'" >> .env.secrets.sh
+          echo "export STANDARD_4_INGEST='${{ secrets.STANDARD_4_INGEST }}'" >> .env.secrets.sh
+          echo "export STANDARD_5_INGEST='${{ secrets.STANDARD_5_INGEST }}'" >> .env.secrets.sh
+          echo "export STANDARD_6_INGEST='${{ secrets.STANDARD_6_INGEST }}'" >> .env.secrets.sh
+          echo "export COMPOSITOR_INGEST='${{ secrets.COMPOSITOR_INGEST }}'" >> .env.secrets.sh
         fi
         chmod +x .env.secrets.sh
 
