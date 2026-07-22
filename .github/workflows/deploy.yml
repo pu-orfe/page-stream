@@ -12,10 +12,13 @@ on:
 jobs:
   deploy:
     name: Build & Deploy Stack
-    # Explicitly list the runner tags as standard YAML sequence elements
     runs-on:
       - self-hosted
       - orfe
+    
+    # Map secrets to job-level environment variables to safely use them in step-level 'if' conditions
+    env:
+      ORFE_SUBMODULE_SSH_KEY_VAL: ${{ secrets.ORFE_SUBMODULE_SSH_KEY }}
     
     steps:
     # 1. Pre-flight dependency check
@@ -64,20 +67,19 @@ jobs:
         echo "==================================="
 
     # 2. Checkout repository and handle submodules
-    # We remove the ${{ }} wrapper around 'if' conditions, which is standard GitHub Actions syntax
     - name: Checkout Repository (with Submodules via SSH Key)
-      if: secrets.ORFE_SUBMODULE_SSH_KEY != ''
+      if: env.ORFE_SUBMODULE_SSH_KEY_VAL != ''
       uses: actions/checkout@v4
       with:
         ssh-key: ${{ secrets.ORFE_SUBMODULE_SSH_KEY }}
         submodules: recursive
 
     - name: Checkout Repository (Standard)
-      if: secrets.ORFE_SUBMODULE_SSH_KEY == ''
+      if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       uses: actions/checkout@v4
 
     - name: Initialize Submodules (fallback using host SSH configuration)
-      if: secrets.ORFE_SUBMODULE_SSH_KEY == ''
+      if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       run: |
         git submodule update --init --recursive
 
