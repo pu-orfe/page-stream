@@ -14,6 +14,22 @@ echo -e "${BLUE}${BOLD}=========================================================
 echo -e "${CYAN}${BOLD}              PAGE-STREAM INTERACTIVE RUNNER BOOTSTRAPPER            ${NC}"
 echo -e "${BLUE}${BOLD}======================================================================${NC}"
 
+# Detect Runner Dir
+RUNNER_DIR="/Users/publicdisplays/actions-runner"
+if [ ! -d "$RUNNER_DIR" ]; then
+    # Fallback to local search or home dir
+    RUNNER_DIR="${HOME}/actions-runner"
+fi
+
+# Helper to check if launchd service is installed
+is_service_installed() {
+    if [ -d "$RUNNER_DIR" ] && [ -f "$RUNNER_DIR/.service" ]; then
+        return 0 # True
+    else
+        return 1 # False
+    fi
+}
+
 # 1. System Resource Check
 echo -e "\n${BOLD}[1/4] Checking System Resources...${NC}"
 PHYSICAL_MEM_GB=$(sysctl hw.memsize | awk '{print $2/1024/1024/1024}')
@@ -61,30 +77,50 @@ echo -e "  ${BOLD}1)${NC} Check Runner Status"
 echo -e "  ${BOLD}2)${NC} Restart Runner Daemon"
 echo -e "  ${BOLD}3)${NC} Stop Runner Daemon"
 echo -e "  ${BOLD}4)${NC} Teardown Local Container Stack (Clean slate)"
-echo -e "  ${BOLD}5)${NC} Bootstrap a New Private Ops Repository (Other Units/Departments)"
-echo -e "  ${BOLD}6)${NC} Exit"
-read -rp "Select an option [1-6]: " OPTION
+echo -e "  ${BOLD}5)${NC} Configure Auto-Start on System Boot (macOS Service)"
+echo -e "  ${BOLD}6)${NC} Bootstrap a New Private Ops Repository (Other Units/Departments)"
+echo -e "  ${BOLD}7)${NC} Exit"
+read -rp "Select an option [1-7]: " OPTION
 
 case $OPTION in
     1)
-        echo -e "\n${CYAN}Checking runner processes...${NC}"
-        if ps aux | grep "Runner.Listener" | grep -v grep &> /dev/null; then
-            echo -e "${GREEN}✓ GitHub Actions self-hosted runner daemon is ACTIVE and running.${NC}"
+        echo -e "\n${CYAN}Checking runner status...${NC}"
+        if is_service_installed; then
+            echo -e "${YELLOW}Service is installed. Reading status via launchctl...${NC}"
+            cd "$RUNNER_DIR" && ./svc.sh status || true
         else
-            echo -e "${RED}✗ GitHub Actions self-hosted runner daemon is STOPPED.${NC}"
+            echo -e "${YELLOW}Service is not installed. Checking manual runner processes...${NC}"
+            if ps aux | grep "Runner.Listener" | grep -v grep &> /dev/null; then
+                echo -e "${GREEN}✓ GitHub Actions self-hosted runner is ACTIVE and running (Manual Mode).${NC}"
+            else
+                echo -e "${RED}✗ GitHub Actions self-hosted runner is STOPPED.${NC}"
+            fi
         fi
         ;;
     2)
         echo -e "\n${YELLOW}Restarting self-hosted runner...${NC}"
-        pkill -f "Runner.Listener" || true
-        ./run.sh &
-        sleep 2
-        echo -e "${GREEN}✓ Runner successfully launched in the background!${NC}"
+        if is_service_installed; then
+            echo -e "Restarting runner service..."
+            cd "$RUNNER_DIR" && ./svc.sh stop || true
+            cd "$RUNNER_DIR" && ./svc.sh start
+            echo -e "${GREEN}✓ Runner service successfully restarted!${NC}"
+        else
+            echo -e "Restarting manual runner process..."
+            pkill -f "Runner.Listener" || true
+            ./run.sh &
+            sleep 2
+            echo -e "${GREEN}✓ Runner successfully launched in manual background mode!${NC}"
+        fi
         ;;
     3)
         echo -e "\n${YELLOW}Stopping self-hosted runner...${NC}"
-        pkill -f "Runner.Listener" || true
-        echo -e "${GREEN}✓ Runner stopped.${NC}"
+        if is_service_installed; then
+            cd "$RUNNER_DIR" && ./svc.sh stop || true
+            echo -e "${GREEN}✓ Runner service stopped.${NC}"
+        else
+            pkill -f "Runner.Listener" || true
+            echo -e "${GREEN}✓ Manual runner stopped.${NC}"
+        fi
         ;;
     4)
         echo -e "\n${RED}${BOLD}Tearing down container stack...${NC}"
@@ -92,6 +128,70 @@ case $OPTION in
         echo -e "${GREEN}✓ All page-stream containers stopped and removed.${NC}"
         ;;
     5)
+        echo -e "\n${BLUE}${BOLD}======================================================================${NC}"
+        echo -e "${CYAN}${BOLD}             CONFIGURING AUTO-START ON SYSTEM BOOT                    ${NC}"
+        echo -e "${BLUE}${BOLD}======================================================================${NC}"
+        
+        # 1. Stop manual runner to avoid collisions
+        echo -e "Stopping any active manual runner instances..."
+        pkill -f Runner.Listener || true
+        
+        # 2. Install Runner as system LaunchAgent service
+        if [ -d "$RUNNER_DIR" ] && [ -f "$RUNNER_DIR/svc.sh" ]; then
+            echo -e "Registering GitHub Actions runner as a system service..."
+            cd "$RUNNER_DIR"
+            if ! ./svc.sh status &> /dev/null; then
+                ./svc.sh install || true
+            fi
+            ./svc.sh start || true
+            echo -e "  ${GREEN}✓ GitHub Actions Runner successfully configured to start on boot.${NC}"
+            cd - > /dev/null
+        else
+            echo -e "  ${RED}✗ Error: Actions runner folder or 'svc.sh' not found at ${RUNNER_DIR}.${NC}"
+        fi
+        
+        # 3. Configure Colima startup LaunchAgent
+        COLIMA_BIN=$(command -v colima || true)
+        if [ -n "$COLIMA_BIN" ]; then
+            echo -e "\nConfiguring Colima (Docker Engine) to auto-start on boot..."
+            PLIST_PATH="${HOME}/Library/LaunchAgents/com.colima.startup.plist"
+            mkdir -p "$(dirname "$PLIST_PATH")"
+            
+            cat <<EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.colima.startup</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${COLIMA_BIN}</string>
+        <string>start</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>${HOME}/Library/Logs/colima-startup.log</string>
+    <key>StandardErrorPath</key>
+    <string>${HOME}/Library/Logs/colima-startup.err</string>
+</dict>
+</plist>
+EOF
+            launchctl unload "$PLIST_PATH" 2>/dev/null || true
+            launchctl load "$PLIST_PATH"
+            echo -e "  ${GREEN}✓ Colima (Docker Engine) successfully configured to start on boot.${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Colima binary not found in PATH. Skipping Colima plist creation.${NC}"
+        fi
+        
+        echo -e "\n${GREEN}${BOLD}✓ Auto-Start configuration complete!${NC}"
+        echo -e "Both your GitHub Runner and Docker Engine (Colima) will now automatically"
+        echo -e "boot up and resume your streaming nodes after a system reboot!"
+        ;;
+    6)
         echo -e "\n${BLUE}${BOLD}======================================================================${NC}"
         echo -e "${CYAN}${BOLD}             BOOTSTRAPPING A NEW DEPARTMENT OPS REPOSITORY            ${NC}"
         echo -e "${BLUE}${BOLD}======================================================================${NC}"
@@ -116,7 +216,7 @@ case $OPTION in
         mkdir -p "${TARGET_DIR}/.github/workflows"
         mkdir -p "${TARGET_DIR}/${DEPT}/assets"
         
-        # 1. Create docker-compose.yml template
+        # Create docker-compose.yml template
         cat <<EOF > "${TARGET_DIR}/${DEPT}/docker-compose.yml"
 services:
   requirements-check:
@@ -154,7 +254,7 @@ services:
     restart: unless-stopped
 EOF
 
-        # 2. Create custom.css and custom.js templates
+        # Create custom.css and custom.js templates
         cat <<EOF > "${TARGET_DIR}/${DEPT}/assets/custom.css"
 /* Custom CSS styling for ${DEPT} public displays */
 body {
@@ -168,13 +268,13 @@ EOF
 console.log("[${DEPT}-inject] custom.js loaded");
 EOF
 
-        # 3. Create target configuration env file
+        # Create target configuration env file
         cat <<EOF > "${TARGET_DIR}/${DEPT}/${DEPT}.env"
 # ${DEPT} public display website targets (safe to check in)
 STANDARD_1_URL=https://example.com/${DEPT}-slideshow
 EOF
 
-        # 4. Create deploy workflow pipeline template
+        # Create deploy workflow pipeline template
         cat <<EOF > "${TARGET_DIR}/.github/workflows/deploy.yml"
 name: Deploy (GitOps)
 
@@ -227,7 +327,7 @@ jobs:
         fi
 EOF
 
-        # 5. Create a local README
+        # Create a local README
         cat <<EOF > "${TARGET_DIR}/README.md"
 # ${DEPT} Page Stream Configuration
 
