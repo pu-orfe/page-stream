@@ -1,7 +1,13 @@
 name: Deploy (GitOps)
 
 on:
-  workflow_dispatch: {} # Manual dispatch only for GitOps deployment
+  workflow_dispatch:
+    inputs:
+      recreate_from_scratch:
+        description: 'Force stop and recreate the entire stack from scratch (causes brief downtime)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -94,7 +100,7 @@ jobs:
         fi
         chmod +x .env.secrets.sh
 
-    # 4. Build & Deploy using Docker Compose (Idempotent updates in-place)
+    # 4. Build & Deploy using Docker Compose (Idempotent updates or forced recreation)
     - name: Build and Update Docker Compose Stack
       run: |
         COMPOSE_CMD="docker compose"
@@ -104,9 +110,18 @@ jobs:
         
         echo "Using compose command: $COMPOSE_CMD"
         
-        # Idempotently update, build, and restart modified services with zero/minimal downtime.
-        # This prevents stopping and starting everything cleanly (which causes needless outages on unaffected streams).
-        source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d --build --remove-orphans
+        if [ "${{ github.event.inputs.recreate_from_scratch }}" = "true" ]; then
+          echo "=== FORCED RECREATION REQUESTED ==="
+          echo "Stopping and tearing down existing stack..."
+          $COMPOSE_CMD -f docker-compose.stable.yml down --remove-orphans
+          
+          echo "Building and starting fresh stack from scratch..."
+          source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d --build
+        else
+          echo "=== IDEMPOTENT UPDATE ==="
+          echo "Updating and rebuilding modified services in-place..."
+          source .env.secrets.sh && $COMPOSE_CMD -f docker-compose.stable.yml up -d --build --remove-orphans
+        fi
 
     # 5. Verify deployment health
     - name: Verify Stack Health
