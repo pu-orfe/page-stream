@@ -78,16 +78,11 @@ jobs:
       if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       uses: actions/checkout@v4
 
-    # Local-only git URL translation so it is strictly scoped to this runner build job
-    - name: Configure Submodules to use HTTPS locally
-      if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
-      run: |
-        git config url."https://github.com/".insteadOf "git@github.com:"
-
+    # Use the dynamic -c flag configuration on the git command to translate submodule URL to HTTPS on-the-fly
     - name: Initialize Submodules (fallback using HTTPS)
       if: env.ORFE_SUBMODULE_SSH_KEY_VAL == ''
       run: |
-        git submodule update --init --recursive
+        git -c url.https://github.com/.insteadOf=git@github.com: submodule update --init --recursive
 
     # 3. Reconstruct environment secrets
     # If ENV_SECRETS_SH is provided as a single secret, write it directly.
