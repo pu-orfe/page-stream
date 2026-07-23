@@ -2,6 +2,7 @@ import http from 'node:http';
 import { execSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { routeV1 } from './v1/index.js';
 
 const PORT = process.env.CONTROL_PORT ? parseInt(process.env.CONTROL_PORT, 10) : 3000;
 const COMPOSE_FILE = process.env.COMPOSE_FILE || 'docker-compose.stable.yml';
@@ -215,11 +216,11 @@ function getLogs(streamId: string): string {
 }
 
 // Set up server
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-MS-Client-Principal, X-Dev-User');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -229,6 +230,8 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const pathname = url.pathname;
+
+  if (await routeV1(req, res, pathname)) return;
 
   // Serve static files for web dashboard if requested
   if (pathname === '/' || pathname.startsWith('/web/')) {
