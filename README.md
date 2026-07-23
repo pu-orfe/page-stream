@@ -4,93 +4,56 @@ A headless, disposable web page video streamer designed to deliver high-fidelity
 
 `page-stream` launches a target URL or local HTML page in a Playwright-controlled Chromium browser under Xvfb (Virtual Framebuffer), captures the visual screen with `ffmpeg` in real-time, encodes it into a highly optimized video stream (H.264), and broadcasts it to any target ingest endpoint (such as Kaltura, YouTube, or local SRT/RTMP listeners).
 
----
+## Features
 
-## ✨ Features
-
-* **Single-Command Streaming:** Instantly stream any web page or local static layout in containerized environments.
-* **Custom Injectable Overrides:** Dynamically inject custom CSS stylesheets and Vanilla JavaScript scripts to format, automate, and skin web pages specifically for kiosk layouts.
-* **Multi-Source Video Compositor:** Composite multiple streaming sources into dynamic collage-style layouts (e.g., side-by-side splits). See [COMPOSITOR-ARCHITECTURE.md](COMPOSITOR-ARCHITECTURE.md).
-* **Direct Video File Loops:** Stream pre-recorded `.mp4` video files continuously in a loop without browser overhead, featuring overlay watermarks and citations.
-* **Resilient Reconnections:** Features robust exponential backoff retry mechanisms for handling SRT and RTMP network drops.
-* **Apple Silicon Native:** Fully optimized and validated for high-performance execution on macOS (Colima/Docker Desktop) and Linux runtimes.
-* **GitOps Production Decoupling:** Securely splits your core code (public) from your deployment orchestration, website targets, and streaming keys (private).
+* Stream any web page or local static layout in containerized environments.
+* Dynamically inject custom CSS stylesheets and Vanilla JavaScript scripts to format, automate, and skin web pages specifically for layouts.
+* Composite multiple streaming sources into dynamic collage-style layouts (e.g., side-by-side splits). See [COMPOSITOR-ARCHITECTURE.md](COMPOSITOR-ARCHITECTURE.md).
+* Stream pre-recorded `.mp4` video files continuously in a loop without browser overhead, featuring overlay watermarks and citations.
+* Robust exponential backoff retry mechanisms for handling SRT and RTMP network drops.
+* Optimized and validated for high-performance execution on macOS and Linux.
+* Splits core page-stream codebase from orchestration, website targets, and streaming keys.
 
 ---
 
-## 🏗 Decoupled GitOps Architecture (Pattern 1)
+## Decoupled GitOps Architecture
 
-For production environments, `page-stream` recommends **Pattern 1 (Ops Repository)**:
-1. **Public Code Repository (`page-stream`):** Contains the open-source streaming engine, Dockerfiles, direct video file configurations, and local utility scripts.
-2. **Private Ops Repository (`page-stream-config`):** Securely stores your live website target maps (`orfe.env`), custom visual styles (`assets/`), and Docker Compose orchestration workflows. Production kaltura ingest stream keys are stored as GitHub Repository Secrets, keeping them 100% safe from public leaks.
+For production environments, combine:
+
+* **Public Code Repository (`page-stream`):** open-source streaming engine, Dockerfiles, direct video file configurations, and local utility scripts.
+* **Private Ops Repository (e.g., `page-stream-config`):** Live target maps (`example.env`), custom visual styles (`assets/`), and Docker Compose orchestration workflows.  Secrets such as ingest stream keys stored as GitHub Repository Secrets.
 
 ---
 
-## 🏛 Quick Start for Other University Units/Departments
+## Quick Start
 
-If you are a different academic department, administrative unit, or student organization (e.g., `economics`, `cs`, `athletics`) and would like to deploy your own high-fidelity public display streams, you don't need to write any configuration or orchestrations from scratch! 
+Deploy your own high-fidelity public display streams. 
 
-We have built a fully automated, interactive bootstrapping wizard right into the repository. 
-
-### **The 4-Step Bootstrap Guide:**
-
-#### **Step 1: Clone the Core Codebase**
+1. Clone the codebase.
 Clone the public streaming engine on your display runner machine:
 ```bash
 git clone https://github.com/pu-orfe/page-stream.git
 cd page-stream
 ```
 
-#### **Step 2: Run the Bootstrapper**
+2. Run the bootstrapper.
 Launch the interactive helper script:
 ```bash
 ./bootstrap-runner.sh
 ```
-Choose **`Option 5) Bootstrap a New Private Ops Repository`**.
+Choose `Option 5) Bootstrap a New Private Ops Repository`
 
-#### **Step 3: Answer the Prompts**
+3. Answer the prompts.
 The wizard will guide you through:
-1. Entering your department code (e.g., `economics`).
-2. Generating a local, custom, structured configuration repository folder containing templates for your `docker-compose.yml`, website target mapping `economics.env`, and visual assets (`assets/custom.css`).
-3. Automatically logging into GitHub and creating a brand new **private, secure configuration repository** on your account (e.g., `pu-orfe/page-stream-config-economics`) using your authenticated `gh` session.
-4. Auto-committing and pushing your new templates to GitHub!
+    1. Entering your department code (e.g., `ECO`).
+    2. Generating a local, custom, structured configuration repository folder containing templates for your `docker-compose.yml`, website target mapping `economics.env`, and visual assets (`assets/custom.css`).
+    3. Automatically logging into GitHub and creating a brand new **private configuration repository** on your account (e.g., `economics/page-stream-config-economics`) using your authenticated `gh` session.
 
-#### **Step 4: Configure & Launch**
+4. Configure & Launch
 Once completed, follow the printed completion instructions:
-1. Add your private Kaltura ingest URLs to your new repository's **GitHub Secrets** (as `STANDARD_1_INGEST`).
-2. Add your target website URLs to your new config file (e.g., `economics/economics.env`).
-3. Register your self-hosted runner for your new private repository, and trigger the **Deploy Action**!
-
----
-
-## 🛠 Local Administration Utilities
-
-We have added two high-fidelity helper utilities to the public repository root to streamline local runner administration:
-
-### **1. Interactive Runner Bootstrapper (`bootstrap-runner.sh`)**
-A friendly, colorful terminal-based control panel to monitor, start, stop, or clean up your self-hosted environment:
-```bash
-./bootstrap-runner.sh
-```
-* **Resource Auditing:** Checks your host's memory, CPU allocations, and active Colima/Docker allocations.
-* **Runner Management:** Checks process statuses, restarts the daemon, or stops the listener.
-* **Quick Teardowns:** Lets you cleanly tear down local docker container stacks in a single click.
-
-### **2. Automated Secrets Syncing (`sync-secrets.sh`)**
-Instantly syncs your local kaltura streaming credentials from `.env.secrets.sh` to your private GitHub configuration repository's secrets using the `gh` API:
-```bash
-./sync-secrets.sh
-```
-* **Zero Manual Effort:** Eliminates copy-pasting multiple complex stream IDs containing `#` into the GitHub UI.
-
----
-
-## 📋 Minimal Host Requirements
-
-Streaming multiple HD browsers and real-time H.264 video encodes requires substantial computing power. 
-
-* **Minimum Developer Allocation:** 6 CPU Cores, 16GB of RAM.
-* **Recommended Production Allocation:** 8 CPU Cores, 16GB of RAM.
+    1. Add your private ingest URLs to your new repository's **GitHub Secrets** (as `STANDARD_1_INGEST`).
+    2. Add your target website URLs to your new config file (e.g., `economics/economics.env`).
+    3. Register your self-hosted runner for your new private repository, and trigger the **Deploy Action**.
 
 > [!NOTE]
 > When launching the stack via Docker Compose, an **automatic system requirements check** runs inside a helper container. If your Docker VM (e.g., Colima) is allocated too little RAM or CPU, the stack will halt with helpful allocation guidance.
@@ -101,9 +64,7 @@ Streaming multiple HD browsers and real-time H.264 video encodes requires substa
 > colima start --cpu 6 --memory 16
 > ```
 
----
-
-## 🚀 Quick Local Demo (Standard Stack)
+## Quick Local Demo (Standard Stack)
 
 To run a stable test stack on your local host using standard fallback mock targets and local SRT output files (without sending to external Kaltura streams):
 
@@ -127,7 +88,7 @@ All outputs will appear as real-time transport stream files inside your local `.
 
 ---
 
-## 🐳 Direct Video File Streaming
+## Direct Video File Streaming
 
 For looping pre-recorded videos without browser/render overhead:
 1. Place your video files (e.g., `input.mp4`) inside the `./videos/` directory (git-ignored, mounted read-only into container).
@@ -141,9 +102,7 @@ docker run --rm \
   --video-loop
 ```
 
----
-
-## 💻 CLI Option Reference
+## CLI Reference
 
 ```text
 page-stream --ingest <URI> [options]
@@ -173,9 +132,3 @@ Optional:
       --video-file <path>         Stream video file directly (bypasses browser)
       --video-loop                Loop video file continuously
 ```
-
----
-
-## 🤝 Contributing & License
-
-For issues, asset additions, or visual layouts, please open an issue in the public [pu-orfe/page-stream](https://github.com/pu-orfe/page-stream) repository. Licensed under MIT.
