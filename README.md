@@ -131,4 +131,33 @@ Optional:
       --inject-js <file>          Inject JavaScript from file into the page
       --video-file <path>         Stream video file directly (bypasses browser)
       --video-loop                Loop video file continuously
+      --fallback-demo-page        Stream the bundled demo page if a local --url is
+                                  missing, instead of exiting (legacy behaviour)
 ```
+
+### `--url` targets
+
+`--url` accepts a remote URL, a `file://` URL, or a filesystem path (absolute or
+relative). Query strings and fragments are preserved in every form, so a page can
+configure itself from its own URL:
+
+```bash
+page-stream --ingest "$INGEST" --url '/assets/slate.html?channel=Studio%20A'
+page-stream --ingest "$INGEST" --url 'file:///assets/slate.html#section'
+```
+
+**A missing local page is fatal.** If the file named by `--url` does not exist,
+page-stream exits non-zero with the resolved path rather than starting the stream:
+
+```text
+Error: Local page not found: /out/assets/slate.html (from --url '/out/assets/slate.html').
+  Pass a filesystem path or file:// URL that exists inside the container - a bind
+  mount may be missing. Use --fallback-demo-page to stream the bundled demo page
+  instead of exiting.
+```
+
+Earlier versions warned and quietly streamed the bundled demo page instead. That is
+the worst outcome for an unattended display: the stream stays up and healthy, so
+nothing alerts, and the wrong content plays until someone happens to look at the
+screen. `--fallback-demo-page` restores the old behaviour where it is genuinely
+wanted.
