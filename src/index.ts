@@ -3,7 +3,7 @@
 // Node and CLI imports
 import { Command } from 'commander';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
@@ -38,11 +38,76 @@ interface StreamOptions {
   overlayLeft?: string; // path to image overlay in lower left corner
   overlayRight?: string; // path to image overlay in lower right corner
   citeText?: string; // citation text to overlay along bottom center
+  fallbackDemoPage?: boolean; // stream the bundled demo page if a local --url is missing
 }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEMO_PAGE = path.join(__dirname, '..', 'demo', 'index.html');
+
+export interface ResolvedTarget {
+  navigateUrl: string; // what Chromium is pointed at
+  localPath?: string; // the file backing it, when the target is not a remote page
+}
+
+/**
+ * Resolve a --url value into something Chromium can navigate to.
+ *
+ * Accepts a remote URL, a `file://` URL, or a filesystem path - each with an optional
+ * query string and fragment. The query is preserved: pages use it to configure
+ * themselves (`?channel=...`, `?debug=1`), so silently dropping it changes what gets
+ * streamed.
+ */
+export function resolveTarget(target: string): ResolvedTarget {
+  if (/^https?:/i.test(target)) return { navigateUrl: target };
+
+  if (/^file:\/\//i.test(target)) {
+    // fileURLToPath ignores search and hash, so this is the file on disk.
+    return { navigateUrl: target, localPath: fileURLToPath(new URL(target)) };
+  }
+
+  // A filesystem path. Test it whole first so a filename that legitimately contains
+  // '?' or '#' still resolves, and only then split off a query/fragment suffix.
+  let filePath = target;
+  let suffix = '';
+  if (!fs.existsSync(target)) {
+    const cut = target.search(/[?#]/);
+    if (cut !== -1) {
+      filePath = target.slice(0, cut);
+      suffix = target.slice(cut);
+    }
+  }
+  const resolved = path.resolve(filePath);
+  return { navigateUrl: pathToFileURL(resolved).href + suffix, localPath: resolved };
+}
+
+/**
+ * Resolve --url, confirming that a local target actually exists.
+ *
+ * A missing local page is fatal by default. Substituting different content while
+ * reporting healthy is the worst outcome for an unattended display: the stream stays
+ * up so nothing alerts, and the wrong thing plays until a human happens to look at a
+ * screen. Pass fallbackDemoPage to opt back into the old behaviour.
+ */
+export function resolveStartUrl(
+  target: string,
+  opts: { fallbackDemoPage?: boolean; demoPage?: string } = {}
+): string {
+  const resolved = resolveTarget(target);
+  if (!resolved.localPath || fs.existsSync(resolved.localPath)) return resolved.navigateUrl;
+
+  if (opts.fallbackDemoPage) {
+    console.warn(`[url] Local page not found, falling back to demo page: ${resolved.localPath}`);
+    return resolveTarget(opts.demoPage ?? DEMO_PAGE).navigateUrl;
+  }
+
+  throw new Error(
+    `Local page not found: ${resolved.localPath} (from --url '${target}').\n` +
+    `  Pass a filesystem path or file:// URL that exists inside the container - a bind\n` +
+    `  mount may be missing. Use --fallback-demo-page to stream the bundled demo page\n` +
+    `  instead of exiting.`
+  );
+}
 const VISIBILITY_OVERRIDE_SCRIPT = `
   Object.defineProperty(document, 'hidden', { get: () => false });
   Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
@@ -64,6 +129,7 @@ export class PageStreamer {
   private userDataDir?: string;
   private suppressApplied = false;
   private xdotoolTried = false;
+  private startUrl?: string; // resolved by start(); see resolveStartUrl
 
   constructor(private opts: StreamOptions) {}
 
@@ -78,11 +144,11 @@ export class PageStreamer {
       this.startHealthLoop();
       return;
     }
-    // Browser-based streaming mode
-    if (!fs.existsSync(this.opts.url) && !/^https?:/i.test(this.opts.url)) {
-      console.warn(`Provided URL not found locally, falling back to demo page: ${this.opts.url}`);
-      this.opts.url = DEMO_PAGE;
-    }
+    // Browser-based streaming mode. Resolve up front so a missing local page fails
+    // here, before ffmpeg starts publishing, rather than streaming the wrong content.
+    this.startUrl = resolveStartUrl(this.opts.url, {
+      fallbackDemoPage: this.opts.fallbackDemoPage,
+    });
     await this.launchBrowser();
     await this.launchFfmpeg();
     this.startHealthLoop();
@@ -105,7 +171,8 @@ export class PageStreamer {
         '--autoplay-policy=no-user-gesture-required'
       ] : [])
     ];
-    const startUrl = this.toFileUrlIfNeeded(this.opts.url);
+    // start() resolves this; recompute for callers that drive launchBrowser directly.
+    const startUrl = this.startUrl ?? this.toFileUrlIfNeeded(this.opts.url);
     const PAGE_LOAD_TIMEOUT_MS = 30000; // 30 seconds
 
     if (this.opts.appMode) {
@@ -266,8 +333,8 @@ export class PageStreamer {
   }
 
   toFileUrlIfNeeded(u: string) {
-    if (/^https?:/i.test(u)) return u;
-    return 'file://' + path.resolve(u);
+    // Delegates to resolveTarget so file:// URLs, query strings and fragments survive.
+    return resolveTarget(u).navigateUrl;
   }
 
   buildFfmpegArgs(): string[] {
@@ -730,6 +797,7 @@ async function main() {
   .option('--crop-infobar <px>', 'Crop this many pixels from the top of the captured video (removes persistent infobar rather than clicking it)', (v: string)=>parseInt(v,10), 0)
   .option('--inject-css <file>', 'Inject CSS from file into the page')
   .option('--inject-js <file>', 'Inject JavaScript from file into the page')
+  .option('--fallback-demo-page', 'If a local --url does not exist, stream the bundled demo page instead of exiting (legacy behaviour; hides misconfiguration)', false)
     .option('--refresh-signal <sig>', 'POSIX signal to trigger page refresh', 'SIGHUP')
     .option('--graceful-stop-signal <sig>', 'Signal to gracefully stop', 'SIGTERM')
   .option('--reconnect-attempts <n>', 'Max reconnect attempts for SRT (0 = infinite)', '0')
@@ -794,6 +862,7 @@ async function main() {
     overlayLeft: opts.overlayLeft,
     overlayRight: opts.overlayRight,
     citeText: opts.citeText,
+    fallbackDemoPage: !!opts.fallbackDemoPage,
   });
 
 
