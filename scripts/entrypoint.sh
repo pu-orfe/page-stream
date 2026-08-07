@@ -9,9 +9,14 @@ fi
 cleanup_pids=()
 cleanup() {
   echo "[entrypoint] Cleaning up background processes..." >&2
-  for pid in "${cleanup_pids[@]}"; do
+  for pid in "${cleanup_pids[@]:-}"; do
     kill "$pid" 2>/dev/null || true
   done
+  # Remove our own X lock so a restart of this container starts clean. This covers the
+  # graceful paths; the startup check above covers SIGKILL, where no trap runs at all.
+  if [[ -n "${XVFB_NUM:-}" ]]; then
+    rm -f "/tmp/.X${XVFB_NUM}-lock" "/tmp/.X11-unix/X${XVFB_NUM}" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -59,7 +64,36 @@ else
     XVFB_W=${WIDTH:-1280}
     XVFB_H=${HEIGHT:-720}
     XVFB_D=${DISPLAY:-:99}
-    Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX 2>/dev/null &
+    # Clear a stale X lock before starting.
+    #
+    # `restart: unless-stopped` restarts the SAME container, so /tmp survives. When the
+    # container is killed ungracefully - which is exactly what an OS reboot does - Xvfb
+    # leaves /tmp/.X<N>-lock and /tmp/.X11-unix/X<N> behind. On the next start Xvfb sees
+    # the lock, refuses the display, and the container enters a restart loop that never
+    # heals on its own. This was the post-reboot failure: 11 restarts, every one of them
+    # dying on the same orphaned lock.
+    #
+    # The lock is only removed when nothing is actually listening on the display, so a
+    # genuinely running Xvfb is never disturbed.
+    XVFB_NUM="${XVFB_D#:}"; XVFB_NUM="${XVFB_NUM%%.*}"
+    XVFB_LOCK="/tmp/.X${XVFB_NUM}-lock"
+    XVFB_SOCK="/tmp/.X11-unix/X${XVFB_NUM}"
+    if [[ -e "$XVFB_LOCK" || -e "$XVFB_SOCK" ]]; then
+      if xdpyinfo -display "$XVFB_D" >/dev/null 2>&1; then
+        echo "[entrypoint] Display $XVFB_D is already live; leaving its lock alone" >&2
+      else
+        echo "[entrypoint] Removing stale X lock for $XVFB_D (no server is listening)" >&2
+        echo "[entrypoint]   this is normal after an ungraceful stop, e.g. a host reboot" >&2
+        rm -f "$XVFB_LOCK" "$XVFB_SOCK" || true
+      fi
+    fi
+
+    # Keep Xvfb's stderr. It was previously sent to /dev/null, which discarded the one
+    # message that explains this failure ("Server is already active for display N ... remove
+    # /tmp/.X<N>-lock") and left only a generic timeout to debug from.
+    XVFB_LOG="/tmp/xvfb-${XVFB_NUM}.log"
+    Xvfb $XVFB_D -screen 0 ${XVFB_W}x${XVFB_H}x24 -ac +extension RANDR +extension GLX \
+      >"$XVFB_LOG" 2>&1 &
     XVFB_PID=$!; cleanup_pids+=("$XVFB_PID")
 
     # Wait for Xvfb to be ready before continuing
@@ -69,9 +103,17 @@ else
         echo "[entrypoint] Xvfb ready (after ${i} attempts)" >&2
         break
       fi
+      # Fail fast if Xvfb has already died: waiting the full 60s for a process that exited
+      # in the first second just delays the restart and muddies the logs.
+      if ! kill -0 "$XVFB_PID" 2>/dev/null; then
+        echo "[entrypoint] ERROR: Xvfb exited immediately. Its output was:" >&2
+        sed 's/^/[xvfb] /' "$XVFB_LOG" >&2 || true
+        exit 1
+      fi
       sleep 0.1
       if [[ $i -eq 600 ]]; then
-        echo "[entrypoint] ERROR: Xvfb failed to start within 60 seconds" >&2
+        echo "[entrypoint] ERROR: Xvfb failed to start within 60 seconds. Its output was:" >&2
+        sed 's/^/[xvfb] /' "$XVFB_LOG" >&2 || true
         exit 1
       fi
     done
