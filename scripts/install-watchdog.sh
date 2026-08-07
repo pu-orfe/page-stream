@@ -115,6 +115,14 @@ cat > "$PLIST" <<PLISTEOF
     <string>-lc</string>
     <string>set -a; [ -f "${ENV_FILE}" ] &amp;&amp; . "${ENV_FILE}"; set +a; exec "${INSTALLED_WATCHDOG}"</string>
   </array>
+  <!-- launchd starts jobs with a minimal PATH; Homebrew (including a non-standard prefix
+       like ~/.homebrew) is not on it. The script also self-heals its PATH, but setting it
+       here means a plain `launchctl kickstart` behaves identically. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${HOME}/.homebrew/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>StartInterval</key><integer>${INTERVAL}</integer>
   <!-- Also run once at load, so a reboot is checked immediately rather than one interval
        later - the reboot is exactly when this stack is most likely to be broken. -->

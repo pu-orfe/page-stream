@@ -41,6 +41,17 @@ for arg in "$@"; do
   esac
 done
 
+# launchd does NOT inherit an interactive shell's PATH, and `bash -lc` only reads bash
+# profiles - so a PATH set in ~/.zshrc (the macOS default shell) is invisible here. On the
+# ORFE runner Homebrew lives at ~/.homebrew, which is not on any default PATH at all. The
+# result was a watchdog that could not find `docker`, concluded Colima was down, and paged
+# about a perfectly healthy stack.
+for _bindir in "$HOME/.homebrew/bin" /opt/homebrew/bin /usr/local/bin /usr/bin /bin; do
+  [ -d "$_bindir" ] && case ":$PATH:" in *":$_bindir:"*) ;; *) PATH="$_bindir:$PATH" ;; esac
+done
+export PATH
+unset _bindir
+
 HC_URL="${HEALTHCHECKS_STACK_URL:-}"
 # Normalise: a pasted trailing slash would make the failure ping "<url>//fail", which
 # 404s silently - so the one signal that matters most would simply never arrive.
@@ -60,11 +71,24 @@ add_detail() { detail="${detail}$1"$'\n'; }
 # --- 1. Is the container runtime even alive? --------------------------------------------
 # Checked first: if Colima is down every other symptom is downstream of it, and reporting
 # seven unhealthy containers would bury the one fact that matters.
-if ! docker info >/dev/null 2>&1; then
+if ! command -v docker >/dev/null 2>&1; then
+  # A MISSING BINARY IS NOT A DOWN STACK. Reporting it as one is a false alarm, and a
+  # watchdog that cries wolf gets muted - at which point it is worse than no watchdog.
+  problems+=("watchdog misconfigured: docker not on PATH")
+  add_detail "WATCHDOG PROBLEM (not necessarily a stack problem):"
+  add_detail "  'docker' is not on PATH, so the stack could not be inspected at all."
+  add_detail "  PATH=$PATH"
+  add_detail "  The stack itself may well be fine. Fix the watchdog's environment first."
+elif ! docker info >/dev/null 2>&1; then
   problems+=("docker/colima unreachable")
-  add_detail "CRITICAL: docker is not responding — Colima is down or did not start at boot."
+  add_detail "CRITICAL: docker is installed but not responding — Colima is down or did not"
+  add_detail "start at boot."
   add_detail ""
-  add_detail "$(colima status 2>&1 | head -5)"
+  if command -v colima >/dev/null 2>&1; then
+    add_detail "$(colima status 2>&1 | head -5)"
+  else
+    add_detail "(colima binary not on PATH, so its status could not be read)"
+  fi
 else
   # --- 2. Every expected container present, running and healthy -------------------------
   IFS=',' read -ra want <<< "$EXPECTED"
