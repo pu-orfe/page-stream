@@ -23,6 +23,12 @@ LABEL="edu.princeton.orfe.page-stream.watchdog"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
 ENV_FILE="$HOME/.page-stream-watchdog.env"
 LOG_DIR="$HOME/Library/Logs/page-stream"
+# The watchdog is COPIED to a stable location rather than run from the checkout. When this
+# installer runs from CI, REPO_ROOT is the runner's workspace, which gets wiped and
+# re-cloned on every deploy - a launchd job pointing there would silently stop working the
+# next time the workspace was cleaned, and nothing would report the monitor itself dying.
+INSTALL_DIR="$HOME/Library/Application Support/page-stream"
+INSTALLED_WATCHDOG="$INSTALL_DIR/stack-watchdog.sh"
 INTERVAL=300
 UNINSTALL=0
 
@@ -42,7 +48,7 @@ printf "${BLUE}${BOLD}==========================================================
 
 if [ "$UNINSTALL" = "1" ]; then
   launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
-  rm -f "$PLIST"
+  rm -f "$PLIST" "$INSTALLED_WATCHDOG"
   printf "  ${GREEN}✓ watchdog removed${NC}\n"
   printf "  ${CYAN}·${NC} %s left in place (delete it yourself if you want the credentials gone)\n" "$ENV_FILE"
   exit 0
@@ -88,8 +94,13 @@ else
   fi
 fi
 
-printf "\n${BOLD}[2/4] Writing the LaunchAgent${NC}\n"
-mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+printf "\n${BOLD}[2/4] Installing the watchdog to a stable path${NC}\n"
+mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR" "$INSTALL_DIR"
+install -m 0755 "$REPO_ROOT/scripts/stack-watchdog.sh" "$INSTALLED_WATCHDOG"
+printf "  ${GREEN}✓ %s${NC}\n" "$INSTALLED_WATCHDOG"
+printf "  ${CYAN}·${NC} copied, not referenced in place, so a CI workspace clean cannot break it\n"
+
+printf "\n${BOLD}[3/4] Writing the LaunchAgent${NC}\n"
 # The job sources the env file at run time rather than embedding values, so rotating a key
 # needs no reinstall - and no secret is ever written into a world-readable plist.
 cat > "$PLIST" <<PLISTEOF
@@ -102,7 +113,7 @@ cat > "$PLIST" <<PLISTEOF
   <array>
     <string>/bin/bash</string>
     <string>-lc</string>
-    <string>set -a; [ -f "${ENV_FILE}" ] &amp;&amp; . "${ENV_FILE}"; set +a; exec "${REPO_ROOT}/scripts/stack-watchdog.sh"</string>
+    <string>set -a; [ -f "${ENV_FILE}" ] &amp;&amp; . "${ENV_FILE}"; set +a; exec "${INSTALLED_WATCHDOG}"</string>
   </array>
   <key>StartInterval</key><integer>${INTERVAL}</integer>
   <!-- Also run once at load, so a reboot is checked immediately rather than one interval
@@ -117,7 +128,7 @@ PLISTEOF
 printf "  ${GREEN}✓ %s${NC}\n" "$PLIST"
 printf "  ${CYAN}·${NC} interval: %ss, plus one run at load\n" "$INTERVAL"
 
-printf "\n${BOLD}[3/4] Loading${NC}\n"
+printf "\n${BOLD}[4/5] Loading${NC}\n"
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 if launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then
   printf "  ${GREEN}✓ loaded via bootstrap${NC}\n"
@@ -127,7 +138,7 @@ else
   printf "  ${RED}✗ could not load the LaunchAgent${NC}\n"; exit 1
 fi
 
-printf "\n${BOLD}[4/4] Verifying${NC}\n"
+printf "\n${BOLD}[5/5] Verifying${NC}\n"
 sleep 2
 if launchctl list | grep -q "$LABEL"; then
   printf "  ${GREEN}✓ registered with launchd${NC}\n"
@@ -136,7 +147,7 @@ else
 fi
 printf "\n"
 printf "${BOLD}Next:${NC}\n"
-printf "  test the wiring end to end:  %s/scripts/stack-watchdog.sh --test-alert\n" "$REPO_ROOT"
+printf "  test the wiring end to end:  \"%s\" --test-alert\n" "$INSTALLED_WATCHDOG"
 printf "  watch it run:                tail -f %s/watchdog.log\n" "$LOG_DIR"
 printf "  remove it:                   %s --uninstall\n" "$0"
 printf "\n"
