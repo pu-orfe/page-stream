@@ -42,6 +42,9 @@ for arg in "$@"; do
 done
 
 HC_URL="${HEALTHCHECKS_STACK_URL:-}"
+# Normalise: a pasted trailing slash would make the failure ping "<url>//fail", which
+# 404s silently - so the one signal that matters most would simply never arrive.
+HC_URL="${HC_URL%/}"
 RESEND_KEY="${RESEND_API_KEY:-}"
 RESEND_TO="${RESEND_TO:-}"
 RESEND_FROM="${RESEND_FROM:-}"
@@ -127,15 +130,25 @@ fi
 # is itself the alarm, which is the one failure mode no on-host check can report.
 if [ -n "$HC_URL" ]; then
   if [ "$healthy" = "yes" ]; then
-    curl -fsS -m 15 --retry 3 -o /dev/null "$HC_URL" \
-      && echo "[watchdog] healthchecks.io: ok" \
-      || echo "[watchdog] healthchecks.io: ping FAILED (network?)" >&2
+    hc_code=$(curl -sS -m 15 --retry 3 -o /dev/null -w '%{http_code}' "$HC_URL" 2>/dev/null || echo 000)
+    case "$hc_code" in
+      200) echo "[watchdog] healthchecks.io: ok" ;;
+      404) echo "[watchdog] healthchecks.io: 404 — HEALTHCHECKS_STACK_URL is wrong; the check is NOT armed" >&2 ;;
+      000) echo "[watchdog] healthchecks.io: unreachable (network)" >&2 ;;
+      *)   echo "[watchdog] healthchecks.io: unexpected HTTP $hc_code" >&2 ;;
+    esac
   else
     # /fail flips the check immediately rather than waiting out the grace period.
-    printf '%s' "$detail" | curl -fsS -m 15 --retry 3 -o /dev/null \
-      --data-binary @- "${HC_URL}/fail" \
-      && echo "[watchdog] healthchecks.io: failure reported" \
-      || echo "[watchdog] healthchecks.io: fail-ping FAILED" >&2
+    # The failure ping matters more than the success ping, so it gets the same specific
+    # diagnosis: "FAILED" alone would leave you unable to tell a wrong URL from an outage.
+    hc_code=$(printf '%s' "$detail" | curl -sS -m 15 --retry 3 -o /dev/null \
+      -w '%{http_code}' --data-binary @- "${HC_URL}/fail" 2>/dev/null || echo 000)
+    case "$hc_code" in
+      200) echo "[watchdog] healthchecks.io: failure reported (detail attached)" ;;
+      400|404) echo "[watchdog] healthchecks.io: HTTP $hc_code — HEALTHCHECKS_STACK_URL is wrong, so THIS ALERT DID NOT ARRIVE" >&2 ;;
+      000) echo "[watchdog] healthchecks.io: unreachable — alert not delivered" >&2 ;;
+      *)   echo "[watchdog] healthchecks.io: unexpected HTTP $hc_code — alert may not have arrived" >&2 ;;
+    esac
   fi
 else
   echo "[watchdog] HEALTHCHECKS_STACK_URL unset — no dead-man's switch configured" >&2
