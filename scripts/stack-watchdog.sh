@@ -59,7 +59,17 @@ HC_URL="${HC_URL%/}"
 RESEND_KEY="${RESEND_API_KEY:-}"
 RESEND_TO="${RESEND_TO:-}"
 RESEND_FROM="${RESEND_FROM:-}"
-EXPECTED="${WATCHDOG_EXPECTED:-standard-1,standard-2,standard-3,standard-4,standard-5,standard-6,compositor}"
+# `-` not `:-`: only an UNSET variable falls back to the built-in list. If the deploy set it
+# to an empty string that is a rendering fault, and quietly substituting a list that names
+# every channel - including any deliberately disabled one - is exactly the false alarm this
+# script exists to avoid. Distinguish the two cases and say which happened.
+EXPECTED="${WATCHDOG_EXPECTED-standard-1,standard-2,standard-3,standard-4,standard-5,standard-6,compositor}"
+EXPECTED_EMPTY=0
+if [ -z "$EXPECTED" ]; then
+  EXPECTED_EMPTY=1
+  echo "[watchdog] WATCHDOG_EXPECTED is set but empty — nothing to check. Re-run" >&2
+  echo "[watchdog] tools/render-config.py <dept>; the deploy derives it from channels.yml." >&2
+fi
 
 HOSTNAME_SHORT=$(hostname -s 2>/dev/null || echo unknown)
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -92,7 +102,11 @@ elif ! docker info >/dev/null 2>&1; then
 else
   # --- 2. Every expected container present, running and healthy -------------------------
   IFS=',' read -ra want <<< "$EXPECTED"
-  for c in "${want[@]}"; do
+  # ${want[@]+...} guards the expansion: an empty EXPECTED leaves `want` unset, and under
+  # `set -u` bash 3.2 (the macOS default, which is what the runner has) aborts on "${want[@]}"
+  # rather than iterating zero times. That would kill the watchdog mid-run with a bash error
+  # and no notification at all - the one failure mode a monitor must never have.
+  for c in ${want[@]+"${want[@]}"}; do
     [ -n "$c" ] || continue
     if ! docker inspect "$c" >/dev/null 2>&1; then
       problems+=("$c missing")
@@ -130,6 +144,17 @@ else
       add_detail ""
     fi
   done
+fi
+
+# An empty expectation means every container check above was skipped, so "no problems" would
+# be a lie: the run proves nothing. Report it as a watchdog fault, the same way a missing
+# docker binary is - not as a down stack.
+if [ "$EXPECTED_EMPTY" = "1" ]; then
+  problems+=("watchdog misconfigured: WATCHDOG_EXPECTED is empty")
+  add_detail "WATCHDOG PROBLEM (not necessarily a stack problem):"
+  add_detail "  WATCHDOG_EXPECTED is empty, so no container was actually checked."
+  add_detail "  The stack may well be fine. Fix the watchdog's configuration first:"
+  add_detail "  it is rendered from channels.yml into <dept>/.env by tools/render-config.py."
 fi
 
 if [ "$TEST_ALERT" = "1" ]; then
