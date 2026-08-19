@@ -71,8 +71,11 @@ RESEND_API_KEY=
 RESEND_TO=
 RESEND_FROM=
 
-# Containers that must be present and healthy. Trim this if a channel is intentionally off,
-# or the watchdog will page you about a channel you retired.
+# Containers that must be present and healthy. DO NOT hand-edit this to take a channel out
+# of service - set `enabled: false` on the channel in <dept>/channels.yml instead. The
+# renderer then emits both this list and DISABLED_SERVICES from that one source, so the
+# deploy stops the container and the watchdog stops expecting it in the same step. Editing
+# only one of the two is how you get either a nagging false alarm or a silent outage.
 WATCHDOG_EXPECTED=standard-1,standard-2,standard-3,standard-4,standard-5,standard-6,compositor
 ENVEOF
   chmod 600 "$ENV_FILE"
