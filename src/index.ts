@@ -260,17 +260,27 @@ export class PageStreamer {
       await this.page.setExtraHTTPHeaders({
         'x-wdsoit-bot-bypass': 'true'
       });
-      console.log(`[page-load] Loading page: ${startUrl} (timeout: ${PAGE_LOAD_TIMEOUT_MS}ms)`);
-      try {
-        await this.page.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
-        console.log('[page-load] Page loaded successfully');
-      } catch (err: any) {
-        if (err.name === 'TimeoutError') {
-          console.warn(`[page-load] WARNING: Page load timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
-          console.warn(`[page-load] URL: ${startUrl}`);
-          console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
-        } else {
-          throw err;
+      const MAX_NAV_RETRIES = 12; // Allow up to 60s for cold-boot network/DNS resolution
+      for (let attempt = 1; attempt <= MAX_NAV_RETRIES; attempt++) {
+        try {
+          console.log(`[page-load] Loading page: ${startUrl} (attempt ${attempt}/${MAX_NAV_RETRIES})`);
+          await this.page.goto(startUrl, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+          console.log('[page-load] Page loaded successfully');
+          break;
+        } catch (err: any) {
+          if (err.name === 'TimeoutError') {
+            console.warn(`[page-load] WARNING: Page load timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
+            console.warn(`[page-load] URL: ${startUrl}`);
+            console.warn('[page-load] Continuing with partial page load - ffmpeg will start but page may not be fully rendered');
+            break;
+          }
+          console.warn(`[page-load] Initial page load attempt ${attempt}/${MAX_NAV_RETRIES} failed: ${err.message || err}`);
+          if (attempt < MAX_NAV_RETRIES) {
+            console.log('[page-load] Waiting 5s for network/DNS connectivity before retry...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          } else {
+            console.warn('[page-load] Max retries reached; continuing startup with partial/error state.');
+          }
         }
       }
     }
@@ -544,7 +554,13 @@ export class PageStreamer {
           console.warn(`[page-load] WARNING: Page refresh timed out after ${PAGE_LOAD_TIMEOUT_MS}ms`);
           console.warn('[page-load] Continuing with partial page load');
         } else {
-          throw err;
+          console.warn(`[page-load] WARNING: Page reload failed (${err.message || err}); trying fallback navigation...`);
+          try {
+            await this.page.goto(this.opts.url, { timeout: PAGE_LOAD_TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+            console.log('[page-load] Fallback navigation complete.');
+          } catch (fallbackErr: any) {
+            console.error('[page-load] Fallback navigation also failed:', fallbackErr.message || fallbackErr);
+          }
         }
       }
       // Re-inject custom content after reload
