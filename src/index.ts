@@ -39,6 +39,7 @@ interface StreamOptions {
   overlayRight?: string; // path to image overlay in lower right corner
   citeText?: string; // citation text to overlay along bottom center
   fallbackDemoPage?: boolean; // stream the bundled demo page if a local --url is missing
+  drawMouse?: boolean; // draw mouse pointer in video capture (default: false)
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -286,6 +287,13 @@ export class PageStreamer {
     }
     // Inject custom content
     await this.injectCustomContent(this.page);
+    if (this.page) {
+      try {
+        await this.page.mouse.move(0, 0);
+      } catch {
+        // ignore
+      }
+    }
     if (this.opts.fullscreen && this.page) {
       try {
         await this.page.evaluate(() => { try { document.body?.focus(); } catch {} });
@@ -369,6 +377,7 @@ export class PageStreamer {
       ...inputFlags,
       // Video input (X11)
       '-f','x11grab',
+      '-draw_mouse', (this.opts.drawMouse ?? (process.env.DRAW_MOUSE === '1' || process.env.DRAW_MOUSE === 'true')) ? '1' : '0',
       '-framerate', String(fps),
       '-video_size', `${width}x${height}`,
       '-i', display,
@@ -826,6 +835,7 @@ async function main() {
   .option('--overlay-left <path>', 'Path to image overlay in lower left corner')
   .option('--overlay-right <path>', 'Path to image overlay in lower right corner')
   .option('--cite-text <text>', 'Overlay citation text along the bottom center of the looping video')
+  .option('--draw-mouse', 'Draw mouse cursor in video capture (default: false)', false)
     .parse(process.argv);
 
   const opts = program.opts();
@@ -879,6 +889,7 @@ async function main() {
     overlayRight: opts.overlayRight,
     citeText: opts.citeText,
     fallbackDemoPage: !!opts.fallbackDemoPage,
+    drawMouse: !!opts.drawMouse || (process.env.DRAW_MOUSE === '1' || process.env.DRAW_MOUSE === 'true'),
   });
 
 

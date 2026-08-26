@@ -101,6 +101,9 @@ else
     for i in {1..600}; do
       if xdpyinfo -display "$XVFB_D" >/dev/null 2>&1; then
         echo "[entrypoint] Xvfb ready (after ${i} attempts)" >&2
+        if command -v xdotool >/dev/null 2>&1; then
+          DISPLAY="$XVFB_D" xdotool mousemove 0 0 2>/dev/null || true
+        fi
         break
       fi
       # Fail fast if Xvfb has already died: waiting the full 60s for a process that exited
