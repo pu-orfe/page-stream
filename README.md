@@ -27,17 +27,13 @@ For production environments, combine:
 
 ## Quick Start
 
-Deploy your own high-fidelity public display streams. 
-
 1. Clone the codebase.
-Clone the public streaming engine on your display runner machine:
 ```bash
 git clone https://github.com/pu-orfe/page-stream.git
 cd page-stream
 ```
 
 2. Run the bootstrapper.
-Launch the interactive helper script:
 ```bash
 ./bootstrap-runner.sh
 ```
@@ -51,7 +47,7 @@ The wizard will guide you through:
 
 4. Configure & Launch
 Once completed, follow the printed completion instructions:
-    1. Add your private ingest URLs to your new repository's **GitHub Secrets** (as `STANDARD_1_INGEST`).
+    1. Add your private ingest URLs (Kaltura, etc) to your new repository's **GitHub Secrets** (as `STANDARD_1_INGEST`).
     2. Add your target website URLs to your new config file (e.g., `economics/economics.env`).
     3. Register your self-hosted runner for your new private repository, and trigger the **Deploy Action**.
 
