@@ -162,6 +162,39 @@ if [ "$TEST_ALERT" = "1" ]; then
   add_detail "This is a TEST raised by --test-alert. The stack was not actually inspected."
 fi
 
+# --- 2b. Capacity ------------------------------------------------------------------------
+# Every channel is an Xvfb + Chromium + ffmpeg pipeline encoding 1080p30, so its cost is
+# roughly constant rather than bursty: how many channels a host can carry is arithmetic, and
+# the useful moment to learn you are near the limit is long before frames start dropping.
+#
+# THIS IS NOT A STACK FAILURE. Being busy is not being broken, and flipping Healthchecks.io
+# to down for it would make a capacity warning indistinguishable from an outage - and train
+# everyone to ignore both. So it never touches `problems`: it rides along in the success
+# ping body and sends at most one email a day.
+CPU_BUDGET="${WATCHDOG_CPU_BUDGET:-70}"
+STATE_DIR="$HOME/Library/Application Support/page-stream"
+CAPACITY_STAMP="$STATE_DIR/capacity-notified"
+NOTIFY_EVERY_SEC="${WATCHDOG_CAPACITY_NOTIFY_SEC:-86400}"
+
+capacity_note=""
+over_budget=0
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 0)
+  # docker stats reports CPU as a percentage of ONE core, so the sum is divided by the core
+  # count to get a share of the host. --no-stream takes a single sample.
+  USED=$(docker stats --no-stream --format '{{.CPUPerc}}' 2>/dev/null \
+    | tr -d '%' | awk '{s+=$1} END {printf "%.0f", s+0}')
+  if [ "${CORES:-0}" -gt 0 ] && [ -n "$USED" ]; then
+    PCT=$(awk -v u="$USED" -v c="$CORES" 'BEGIN {printf "%.0f", u/c}')
+    capacity_note="cpu ${PCT}% of ${CORES} cores (budget ${CPU_BUDGET}%)"
+    if [ "$PCT" -ge "$CPU_BUDGET" ]; then
+      over_budget=1
+      capacity_note="$capacity_note - AT OR OVER BUDGET"
+    fi
+  fi
+fi
+[ -n "$capacity_note" ] && echo "[watchdog] capacity: $capacity_note"
+
 healthy=$([ ${#problems[@]} -eq 0 ] && echo yes || echo no)
 summary="${#problems[@]} problem(s)"
 [ "$healthy" = "yes" ] && summary="all channels healthy"
@@ -179,7 +212,10 @@ fi
 # is itself the alarm, which is the one failure mode no on-host check can report.
 if [ -n "$HC_URL" ]; then
   if [ "$healthy" = "yes" ]; then
-    hc_code=$(curl -sS -m 15 --retry 3 -o /dev/null -w '%{http_code}' "$HC_URL" 2>/dev/null || echo 000)
+    # A body on the success ping too: Healthchecks.io keeps it, so the capacity trend is
+    # visible on the check's history without any of it counting as a failure.
+    hc_code=$(printf '%s' "${capacity_note:-ok}" | curl -sS -m 15 --retry 3 -o /dev/null \
+      -w '%{http_code}' --data-binary @- "$HC_URL" 2>/dev/null || echo 000)
     case "$hc_code" in
       200) echo "[watchdog] healthchecks.io: ok" ;;
       404) echo "[watchdog] healthchecks.io: 404 — HEALTHCHECKS_STACK_URL is wrong; the check is NOT armed" >&2 ;;
@@ -236,6 +272,51 @@ Diagnostics (full capture, credentials redacted):
   fi
 elif [ "$healthy" != "yes" ]; then
   echo "[watchdog] resend not configured — no detail email sent" >&2
+fi
+
+# --- 5. Capacity email, rate limited -----------------------------------------------------
+# Once a day while the condition persists, not once every five minutes. A warning that
+# repeats every run is a warning that gets filtered to a folder nobody opens.
+if [ "$over_budget" = "1" ] && [ -n "$RESEND_KEY" ] && [ -n "$RESEND_TO" ] && [ -n "$RESEND_FROM" ]; then
+  last=0
+  [ -f "$CAPACITY_STAMP" ] && last=$(cat "$CAPACITY_STAMP" 2>/dev/null || echo 0)
+  now=$(date +%s)
+  if [ $((now - last)) -ge "$NOTIFY_EVERY_SEC" ]; then
+    body="page-stream capacity notice
+host:     ${HOSTNAME_SHORT}
+observed: ${NOW}
+
+${capacity_note}
+
+Nothing is broken. Every channel is an Xvfb + Chromium + ffmpeg pipeline encoding 1080p30,
+so cost per channel is near constant and this host is approaching the number of channels it
+can carry. Adding another is a placement decision, not a tuning one:
+
+  * page-stream-config/orfe/channels.yml -> hosts: registry and the per-channel host: field
+  * moving a channel is one line, then a deploy
+
+This notice is sent at most once every $((NOTIFY_EVERY_SEC / 3600))h while the condition holds."
+    payload=$(jq -n --arg from "$RESEND_FROM" --arg to "$RESEND_TO" \
+                    --arg subject "[page-stream] capacity ${PCT}% on ${HOSTNAME_SHORT}" \
+                    --arg text "$body" \
+                    '{from:$from, to:($to|split(",")), subject:$subject, text:$text}')
+    code=$(curl -fsS -m 20 -o /dev/null -w '%{http_code}' \
+      -X POST https://api.resend.com/emails \
+      -H "Authorization: Bearer ${RESEND_KEY}" \
+      -H "Content-Type: application/json" -d "$payload" 2>/dev/null || echo 000)
+    if [ "$code" = "200" ]; then
+      mkdir -p "$STATE_DIR" && printf '%s' "$now" > "$CAPACITY_STAMP"
+      echo "[watchdog] capacity notice emailed"
+    else
+      echo "[watchdog] capacity notice FAILED (http $code)" >&2
+    fi
+  else
+    echo "[watchdog] capacity over budget; already notified within the window"
+  fi
+elif [ "$over_budget" = "0" ]; then
+  # Clear the stamp so the NEXT breach notifies immediately rather than waiting out a window
+  # that started during a previous, unrelated one.
+  rm -f "$CAPACITY_STAMP" 2>/dev/null || true
 fi
 
 # Exit non-zero on problems so launchd/cron logs and any wrapper can see it.

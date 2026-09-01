@@ -32,6 +32,7 @@ function fakeDockerDir(): string {
 case "$1" in
   info) exit 0 ;;
   logs) echo "fake: no errors"; exit 0 ;;
+  stats) printf '%s\n' \${FAKE_CPU:-10.0%} \${FAKE_CPU:-10.0%}; exit 0 ;;
   inspect)
     name="$2"
     listed() { case ",$1," in *",$name,"*) return 0 ;; esac; return 1; }
@@ -135,4 +136,45 @@ test('the failure ping URL cannot acquire a double slash', () => {
   const src = readFileSync(watchdog, 'utf8');
   assert.match(src, /HC_URL="\$\{HC_URL%\/\}"/,
     'a pasted trailing slash makes "<url>//fail" 404 and the alert never arrives');
+});
+
+
+// ---- capacity ---------------------------------------------------------------------------
+// Being busy is not being broken. These pin that distinction, because getting it wrong makes
+// a capacity warning indistinguishable from an outage and trains everyone to ignore both.
+
+test('capacity is reported on every run', () => {
+  const out = run({ WATCHDOG_EXPECTED: ALL, FAKE_RUNNING: ALL, FAKE_CPU: '10.0%' });
+  assert.match(out, /capacity: cpu \d+% of \d+ cores \(budget 70%\)/, out);
+});
+
+test('being over budget is NOT a stack failure', () => {
+  // The whole point: a busy host must still report healthy, or Healthchecks.io flips to down
+  // and a capacity notice reads as an outage.
+  const out = run({ WATCHDOG_EXPECTED: ALL, FAKE_RUNNING: ALL, FAKE_CPU: '900.0%',
+                    WATCHDOG_CPU_BUDGET: '1' });
+  assert.match(out, /AT OR OVER BUDGET/, out);
+  assert.match(out, /all channels healthy/, 'a busy host was reported as a broken one');
+  assert.doesNotMatch(out, /problem\(s\)/, out);
+});
+
+test('under budget says so without flagging', () => {
+  const out = run({ WATCHDOG_EXPECTED: ALL, FAKE_RUNNING: ALL, FAKE_CPU: '1.0%',
+                    WATCHDOG_CPU_BUDGET: '99' });
+  assert.doesNotMatch(out, /OVER BUDGET/, out);
+  assert.match(out, /all channels healthy/, out);
+});
+
+test('the budget is configurable', () => {
+  const out = run({ WATCHDOG_EXPECTED: ALL, FAKE_RUNNING: ALL, FAKE_CPU: '10.0%',
+                    WATCHDOG_CPU_BUDGET: '42' });
+  assert.match(out, /budget 42%/, out);
+});
+
+test('the capacity email is rate limited, not sent every run', () => {
+  const src = readFileSync(watchdog, 'utf8');
+  assert.match(src, /NOTIFY_EVERY_SEC/,
+    'no rate limit; a five-minute watchdog would email a capacity notice 288 times a day');
+  assert.match(src, /rm -f "\$CAPACITY_STAMP"/,
+    'the stamp is never cleared, so a later breach would wait out a window it did not start');
 });
