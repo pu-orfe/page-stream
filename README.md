@@ -4,6 +4,8 @@ A headless, disposable web page video streamer designed to deliver high-fidelity
 
 `page-stream` launches a target URL or local HTML page in a Playwright-controlled Chromium browser under Xvfb (Virtual Framebuffer), captures the visual screen with `ffmpeg` in real-time, encodes it into a highly optimized video stream (H.264), and broadcasts it to any target ingest endpoint (such as Kaltura, YouTube, or local SRT/RTMP listeners).
 
+Display the resulting stream on Apple TV connected to public displays via [AutoStreamDisplay](https://apps.apple.com/us/app/autostreamdisplay/id6798754784).
+
 ## Features
 
 * Stream any web page or local static layout in containerized environments.
