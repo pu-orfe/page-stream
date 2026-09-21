@@ -1,20 +1,20 @@
 # Page Stream
 
-A headless, disposable web page video streamer designed to deliver high-fidelity web content, schedules, and loops directly to public displays.
-
-`page-stream` launches a target URL or local HTML page in a Playwright-controlled Chromium browser under Xvfb (Virtual Framebuffer), captures the visual screen with `ffmpeg` in real-time, encodes it into a highly optimized video stream (H.264), and broadcasts it to any target ingest endpoint (such as Kaltura, YouTube, or local SRT/RTMP listeners).
+A headless web page video streamer for public displays. It loads a URL in a
+Playwright-controlled Chromium under Xvfb, captures the virtual display with `ffmpeg`,
+and publishes H.264 to any SRT/RTMP ingest — Kaltura, a self-hosted MediaMTX relay,
+YouTube, or a local listener.
 
 Display the resulting stream on Apple TV connected to public displays via [AutoStreamDisplay](https://apps.apple.com/us/app/autostreamdisplay/id6798754784).
 
 ## Features
 
-* Stream any web page or local static layout in containerized environments.
-* Dynamically inject custom CSS stylesheets and Vanilla JavaScript scripts to format, automate, and skin web pages specifically for layouts.
-* Composite multiple streaming sources into dynamic collage-style layouts (e.g., side-by-side splits). See [COMPOSITOR-ARCHITECTURE.md](COMPOSITOR-ARCHITECTURE.md).
-* Stream pre-recorded `.mp4` video files continuously in a loop without browser overhead, featuring overlay watermarks and citations.
-* Robust exponential backoff retry mechanisms for handling SRT and RTMP network drops.
-* Optimized and validated for high-performance execution on macOS and Linux.
-* Splits core page-stream codebase from orchestration, website targets, and streaming keys.
+* Stream any web page or local HTML, with injected CSS and JavaScript to skin it for a
+  display.
+* Composite several sources into one frame — see [COMPOSITOR-ARCHITECTURE.md](COMPOSITOR-ARCHITECTURE.md).
+* Loop a local `.mp4` without browser overhead, with overlay watermarks.
+* Exponential-backoff reconnect for SRT and RTMP drops.
+* Separates the engine from channel maps, assets and stream keys.
 
 ---
 
@@ -100,6 +100,53 @@ docker run --rm \
   --video-loop
 ```
 
+## Operations
+
+**Exit codes are part of the contract** — orchestration asserts on them.
+
+| | |
+| :--- | :--- |
+| `0` | graceful stop |
+| `1` | internal error |
+| `10` | reconnect attempts exhausted (SRT/RTMP only) |
+| `11` | ffmpeg failed on a protocol that is not retried |
+
+Reconnect is protocol-gated: only `srt://` and `rtmp(s)://` get backoff. Everything else
+exits `11` on the first ffmpeg failure. That gating is load-bearing wherever the ingest is
+a relay that reboots for patching — the producers come back on their own.
+
+**Health lines.** Every `--health-interval-seconds` (default 30, `0` disables) the process
+logs one line of JSON after a `[health]` prefix: uptime, protocol, `restartAttempt`,
+`lastFfmpegExitCode`, and `retrying`. Note it carries the ingest URI verbatim, which
+includes the stream credential — everything downstream redacts it, and anything new that
+reads these logs must too.
+
+**The stack watchdog.** `scripts/stack-watchdog.sh`, installed as a LaunchAgent by
+`scripts/install-watchdog.sh`, runs on the host rather than in a container, because a
+container cannot report that the container runtime is down. It pings Healthchecks.io as a
+dead-man's switch and emails detail through Resend on failure.
+
+```bash
+scripts/install-watchdog.sh --interval 300
+scripts/stack-watchdog.sh --dry-run      # print, send nothing
+scripts/stack-watchdog.sh --test-alert   # prove the wiring end to end
+```
+
+It distinguishes three things a monitor must never conflate: a **problem** (a container
+down, unhealthy, or crash-looping), a **capacity warning** (over CPU budget — rides the
+success ping, at most one email a day), and a **watchdog fault** (`docker` missing, or an
+empty `WATCHDOG_EXPECTED`). A run that checked nothing never reports healthy.
+
+`WATCHDOG_EXPECTED` is rendered from the channel map, so a channel disabled on purpose
+cannot page anyone.
+
+**A container healthcheck is not proof of delivery.** `pgrep Xvfb && pgrep chrome &&
+pgrep ffmpeg` passes while ffmpeg reconnects to an ingest that rejects it — every signal
+green, the display frozen. Whatever the ingest is, confirm bytes are arriving at the far
+end, and that they are still rising a minute later.
+
+---
+
 ## CLI Reference
 
 ```text
@@ -114,7 +161,7 @@ Optional:
       --height <n>            Height (default 720)
       --fps <n>               FPS (default 30)
       --preset <p>            x264 preset (default veryfast)
-      --video-bitrate <kbps>  Video bitrate (default 2500k)
+      --video-bitrate <kbps>  Video bitrate (default 2500k; see note below)
       --audio-bitrate <kbps>  Audio bitrate (default 128k)
       --format <fmt>          Container format (default mpegts)
       --extra-ffmpeg <args..> Additional raw ffmpeg args
@@ -132,6 +179,14 @@ Optional:
       --fallback-demo-page        Stream the bundled demo page if a local --url is
                                   missing, instead of exiting (legacy behaviour)
 ```
+
+### `--video-bitrate`
+
+The default is 2500k, which suits a Kaltura ingest that transcodes. A passthrough relay
+does not re-encode, so whatever is sent is exactly what it pays egress on — and egress
+scales with viewers, not channels. Deployments publishing to a relay should cap this from
+their channel map rather than per container: `page-stream-config` renders one
+`DEFAULT_VIDEO_BITRATE` into every producer for that reason.
 
 ### `--url` targets
 
