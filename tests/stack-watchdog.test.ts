@@ -48,6 +48,14 @@ case "$1" in
       *Health.Log*)    echo "Xvfb missing" ;;
       *Health.Status*) echo "$health" ;;
       *RestartCount*)  echo "$restarts" ;;
+      *Config.Cmd*)
+        # The ingest URI as it appears in the container argv. FAKE_INGEST maps
+        # name=streamid pairs; anything unlisted gets its own name, the routed case.
+        dest="publish:$name"
+        for pair in \${FAKE_INGEST:-}; do
+          case "$pair" in "$name="*) dest="\${pair#*=}" ;; esac
+        done
+        printf '["--ingest","srt://relay:8890?streamid=%s&passphrase=SECRET&pbkeylen=32"]\\n' "$dest" ;;
       *) echo "" ;;
     esac
     exit 0 ;;
@@ -138,6 +146,67 @@ test('the failure ping URL cannot acquire a double slash', () => {
     'a pasted trailing slash makes "<url>//fail" 404 and the alert never arrives');
 });
 
+
+// ---- publishing to the right place ------------------------------------------------------
+// A MISSING publisher the relay notices. Two ingest secrets SWAPPED it cannot: both paths
+// receive bytes, every process is alive, every healthcheck passes, and two displays show
+// each other's content until a person happens to look.
+
+test('a container publishing to the wrong path is reported, though it is healthy', () => {
+  const out = run({
+    FAKE_RUNNING: 'standard-6,standard-1',
+    WATCHDOG_EXPECTED: 'standard-6,standard-1',
+    INGEST_EXPECTED: 'standard-6:publish:news,standard-1:publish:scenic',
+    FAKE_INGEST: 'standard-6=publish:scenic standard-1=publish:news',
+  });
+  // The detail lines are what --dry-run surfaces; the problems array reaches the ping.
+  assert.match(out, /standard-6: expected to publish to 'publish:news'/);
+  assert.match(out, /standard-1: expected to publish to 'publish:scenic'/);
+  assert.match(out, /2 problem\(s\)/);
+  assert.doesNotMatch(out, /all channels healthy/,
+    'two swapped destinations reported as a healthy stack');
+});
+
+test('correctly routed containers are silent', () => {
+  const out = run({
+    FAKE_RUNNING: 'standard-6,standard-1',
+    WATCHDOG_EXPECTED: 'standard-6,standard-1',
+    INGEST_EXPECTED: 'standard-6:publish:news,standard-1:publish:scenic',
+    FAKE_INGEST: 'standard-6=publish:news standard-1=publish:scenic',
+  });
+  assert.match(out, /all channels healthy/);
+});
+
+test('a Kaltura channel is matched on its entry id', () => {
+  const out = run({
+    FAKE_RUNNING: 'standard-2',
+    WATCHDOG_EXPECTED: 'standard-2',
+    INGEST_EXPECTED: 'standard-2:e=1_lmggke0v',
+    FAKE_INGEST: 'standard-2=#:::e=1_lmggke0v,st=0,p=KEY',
+  });
+  assert.match(out, /all channels healthy/);
+});
+
+test('the ingest URI never reaches the report', () => {
+  // The report goes into an email and a ping body; the URI carries the stream credential.
+  const out = run({
+    FAKE_RUNNING: 'standard-6',
+    WATCHDOG_EXPECTED: 'standard-6',
+    INGEST_EXPECTED: 'standard-6:publish:news',
+    FAKE_INGEST: 'standard-6=publish:scenic',
+  });
+  assert.match(out, /expected to publish to/);
+  assert.doesNotMatch(out, /SECRET/, 'the passphrase leaked into the watchdog report');
+});
+
+test('an unset INGEST_EXPECTED skips the check rather than failing every container', () => {
+  const out = run({
+    FAKE_RUNNING: 'standard-6',
+    WATCHDOG_EXPECTED: 'standard-6',
+    FAKE_INGEST: 'standard-6=publish:anything',
+  });
+  assert.match(out, /all channels healthy/);
+});
 
 // ---- capacity ---------------------------------------------------------------------------
 // Being busy is not being broken. These pin that distinction, because getting it wrong makes

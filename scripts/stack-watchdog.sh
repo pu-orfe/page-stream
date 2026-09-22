@@ -64,6 +64,12 @@ RESEND_FROM="${RESEND_FROM:-}"
 # every channel - including any deliberately disabled one - is exactly the false alarm this
 # script exists to avoid. Distinguish the two cases and say which happened.
 EXPECTED="${WATCHDOG_EXPECTED-standard-1,standard-2,standard-3,standard-4,standard-5,standard-6,compositor}"
+
+# WHERE each producer must publish, as producer:token pairs from INGEST_EXPECTED.
+#
+# Unset means this deploy predates the check, and it is skipped rather than guessed at -
+# inventing an expectation would report every container as misrouted.
+INGEST_EXPECTED="${INGEST_EXPECTED-}"
 EXPECTED_EMPTY=0
 if [ -z "$EXPECTED" ]; then
   EXPECTED_EMPTY=1
@@ -121,6 +127,40 @@ else
     # that is precisely what a crash loop looks like at any single instant.
     looping=0
     [ "${restarts:-0}" -ge 5 ] && looping=1
+
+    # IS IT PUBLISHING WHERE THE CHANNEL MAP SAYS?
+    #
+    # This runs for HEALTHY containers, which is the entire point. A missing publisher the
+    # relay notices; two ingest secrets SWAPPED it cannot - both paths receive bytes,
+    # every process is alive, every healthcheck passes, and two displays show each other's
+    # content until a person notices.
+    #
+    # The token is compared, never the URI. That URI carries the stream credential, and
+    # this text reaches an email and a ping body.
+    if [ -n "$INGEST_EXPECTED" ] && [ "$state" = "running" ]; then
+      # NOT `want`: that is the array this very loop is iterating, and assigning to it
+      # here would truncate the container list mid-run.
+      want_dest=""
+      IFS=',' read -ra pairs <<< "$INGEST_EXPECTED"
+      for pair in ${pairs[@]+"${pairs[@]}"}; do
+        case "$pair" in
+          "$c":*) want_dest="${pair#"$c":}" ;;
+        esac
+      done
+      if [ -n "$want_dest" ]; then
+        cmd=$(docker inspect "$c" --format '{{json .Config.Cmd}}' 2>/dev/null)
+        case "$cmd" in
+          *"$want_dest"*)
+            : ;;
+          *)
+            problems+=("$c is publishing to the wrong destination")
+            add_detail "$c: expected to publish to '$want_dest', and its ingest does not contain it."
+            add_detail "    Every process is alive and the healthcheck passes, so nothing"
+            add_detail "    else will report this. Check the ${c//-/_} ingest secret."
+            ;;
+        esac
+      fi
+    fi
 
     if [ "$state" != "running" ] || { [ "$health" != "healthy" ] && [ "$health" != "none" ]; } || [ "$looping" = "1" ]; then
       problems+=("$c ${state}/${health}${looping:+ restarts=$restarts}")
