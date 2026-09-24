@@ -619,6 +619,13 @@ export class PageStreamer {
     const delay = Math.min(reconnectInitialDelayMs * Math.pow(2, this.restartAttempt - 1), reconnectMaxDelayMs);
     console.warn(`ffmpeg exited (code=${code}). Scheduling ${this.protocolName(ingest)} reconnect attempt ${this.restartAttempt} in ${delay}ms`);
     this.restartTimer = setTimeout(() => {
+      // The wait is over, so nothing is pending any more. Without this the handle
+      // outlives the timer that already fired and `retrying` in the health line stays
+      // true for the life of the container - after one reconnect, every health line
+      // claims the stream is down while it streams perfectly. On 2026-09-23 that had all
+      // ten containers on display-1 reporting retrying:true twenty minutes after they had
+      // recovered, which is worse than not reporting at all.
+      this.restartTimer = undefined;
       if (this.stopping) return;
       this.launchFfmpeg().catch(err => console.error('ffmpeg restart failed', err));
     }, delay);
