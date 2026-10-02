@@ -301,4 +301,19 @@ trap 'echo "Container caught HUP -> refreshing"; kill -HUP $APP_PID' HUP
 # Graceful stop
 trap 'echo "Stopping..."; kill -TERM $APP_PID; wait $APP_PID || true; exit 0' TERM INT
 
-wait $APP_PID
+# WAIT UNTIL THE APP HAS ACTUALLY EXITED, not merely until `wait` returns.
+#
+# bash's `wait` returns early - status 128+N - whenever a TRAPPED signal arrives, and
+# HUP is trapped above to mean "refresh". A bare `wait $APP_PID` here therefore returned
+# 129 on every refresh signal, `set -e` ended the script, and the container exited with
+# the app still running. Docker counts an exit caused by `docker kill` as a deliberate
+# stop, so `restart: unless-stopped` did not bring it back: on 2026-10-02 a refresh of
+# standard-3 took the Undergraduate channel off the air until someone restarted it.
+#
+# So: wait again for as long as the app is alive, and exit with the app's own status.
+app_status=0
+while :; do
+  wait "$APP_PID" && app_status=0 || app_status=$?
+  kill -0 "$APP_PID" 2>/dev/null || break
+done
+exit "$app_status"
