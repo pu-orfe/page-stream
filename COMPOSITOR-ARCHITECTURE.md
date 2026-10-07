@@ -91,7 +91,7 @@ Run two Playwright/Chromium instances side-by-side in a single Xvfb desktop at 1
 1. **Separate networks** — `default` vs `compositor_net` ensures no cross-contamination
 2. **No depends_on for standard instances** — they start independently
 3. **Health checks** — compositor waits for FFmpeg readiness before sources connect
-4. **Restart policies** — `restart: unless-stopped` for standard instances, `restart: on-failure` for compositor components (allows manual stop/start)
+4. **Restart policies** — `restart: unless-stopped` everywhere, compositor components included. `on-failure` looks right for components you may stop by hand, but it does not restart a container that exited 0, and a Docker daemon restart (which a reboot can trigger) stops every container with exit 0. On 2026-10-07 that left `source-left` down after a routine reboot; and because the compositor opens its inputs in order, waiting on the left listener before it opens the right one, `source-right` could not connect either and the composite stayed dark. `docker stop` still keeps an `unless-stopped` container down, so manual stop/start works the same.
 5. **Resource limits** (optional) — prevent runaway containers from starving others
 
 ### Service Definitions
@@ -142,7 +142,7 @@ compositor:
     timeout: 3s
     retries: 10
     start_period: 10s
-  restart: on-failure
+  restart: unless-stopped
 ```
 
 #### 3. Half-Width Sources (2 instances)
@@ -163,7 +163,7 @@ source-left:
     --ingest srt://compositor:10001?streamid=left
     --url "file:///app/demo/index.html"
     --auto-refresh-seconds 1800
-  restart: on-failure
+  restart: unless-stopped
 
 source-right:
   build: .
@@ -181,7 +181,7 @@ source-right:
     --ingest srt://compositor:10002?streamid=right
     --url "https://example.com"
     --auto-refresh-seconds 1800
-  restart: on-failure
+  restart: unless-stopped
 ```
 
 #### 4. Standard Streaming Instances (3 instances)

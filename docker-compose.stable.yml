@@ -95,7 +95,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    restart: on-failure
+    restart: unless-stopped  # not on-failure: a clean exit (e.g. a daemon restart) is not a failure
 
   # ============================================================================
   # Half-Width Sources for Compositor (960×1080)
@@ -145,7 +145,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    restart: on-failure
+    restart: unless-stopped  # not on-failure: a clean exit (e.g. a daemon restart) is not a failure
 
   source-right:
     image: page-stream:latest
@@ -189,7 +189,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    restart: on-failure
+    restart: unless-stopped  # not on-failure: a clean exit (e.g. a daemon restart) is not a failure
 
   # ============================================================================
   # Standard Streaming Instances (1920×1080, isolated from compositor)

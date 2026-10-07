@@ -150,11 +150,28 @@ case $OPTION in
             echo -e "  ${RED}✗ Error: Actions runner folder or 'svc.sh' not found at ${RUNNER_DIR}.${NC}"
         fi
         
-        # 3. Configure Colima startup LaunchAgent
+        # 3. Configure Colima startup LaunchAgent - unless Homebrew already starts it.
+        #
+        # ONE starter, never two. `brew services start colima` installs its own agent
+        # (homebrew.mxcl.colima). With both present they race at boot: one `colima start`
+        # fails (this agent showed exit status 1 after every reboot), and on 2026-10-07 the
+        # Docker daemon bounced 8 seconds after first coming up, stopping every container.
+        # A re-run of this script also removes our agent where Homebrew's is present, so it
+        # repairs hosts set up before this check existed.
         COLIMA_BIN=$(command -v colima || true)
-        if [ -n "$COLIMA_BIN" ]; then
+        PLIST_PATH="${HOME}/Library/LaunchAgents/com.colima.startup.plist"
+        BREW_COLIMA_PLIST="${HOME}/Library/LaunchAgents/homebrew.mxcl.colima.plist"
+        if [ -f "$BREW_COLIMA_PLIST" ]; then
+            echo -e "\nColima is already started at boot by Homebrew (homebrew.mxcl.colima)."
+            if [ -f "$PLIST_PATH" ]; then
+                launchctl unload "$PLIST_PATH" 2>/dev/null || true
+                rm -f "$PLIST_PATH"
+                echo -e "  ${GREEN}✓ Removed the duplicate com.colima.startup agent; two starters race at boot.${NC}"
+            else
+                echo -e "  ${GREEN}✓ Leaving it to Homebrew; not installing a second starter.${NC}"
+            fi
+        elif [ -n "$COLIMA_BIN" ]; then
             echo -e "\nConfiguring Colima (Docker Engine) to auto-start on boot..."
-            PLIST_PATH="${HOME}/Library/LaunchAgents/com.colima.startup.plist"
             mkdir -p "$(dirname "$PLIST_PATH")"
             
             cat <<EOF > "$PLIST_PATH"
